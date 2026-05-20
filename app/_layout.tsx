@@ -120,6 +120,27 @@ function ThemedStack() {
             presentation: "modal",
           }}
         />
+        <Stack.Screen
+          name="modals/market-select"
+          options={{
+            title: "Mercado",
+            presentation: "modal",
+          }}
+        />
+        <Stack.Screen
+          name="modals/add-item"
+          options={{
+            title: "Adicionar item",
+            presentation: "modal",
+          }}
+        />
+        <Stack.Screen
+          name="modals/item-detail"
+          options={{
+            title: "Detalhes do produto",
+            presentation: "modal",
+          }}
+        />
       </Stack>
     </View>
   );

@@ -1,56 +1,252 @@
 /**
- * Tela Carrinho (Stage 1 — skeleton).
+ * Tela do Carrinho — feature central do Fynner (Stage 3).
  *
- * Esta é a tela principal do app. No Stage 3 vamos implementar:
- * - Header com nome do mercado e data
- * - TotalBanner com total e barra de orçamento
- * - Lista de itens (CartItem) com botões +/− e swipe-delete
- * - Footer fixo com botões "Escanear" e "Inserir manualmente"
+ * Composição vertical:
+ *   [ScreenHeader]          → título + tema + settings
+ *   [MarketHeader]          → mercado ativo + data + trocar
+ *   [TotalBanner]           → total + orçamento (toca para editar)
+ *   [SwipeListView itens]   → cada item com +/− e swipe-esquerda pra deletar
+ *   [Footer fixo]           → Escanear · Inserir manualmente · Finalizar
  *
- * No Stage 1 é só skeleton com:
- * - Header com título "Carrinho"
- * - Botão de tema (sol/lua) — único interativo neste stage
- * - Botão de engrenagem que abre /settings
- * - Texto de placeholder
+ * Comportamento:
+ * - Se não há sessão ativa, mostra EmptyState com CTA "Selecionar mercado".
+ * - Se há sessão mas zero itens, mostra EmptyState com CTA "Adicionar item".
+ * - O total e a barra de orçamento atualizam em tempo real após cada ação
+ *   (o CartContext recarrega tudo do banco após mutações).
  */
-import { StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { SwipeListView } from "react-native-swipe-list-view";
 
+import { BudgetModal } from "@/components/cart/BudgetModal";
+import { CartItem } from "@/components/cart/CartItem";
+import { MarketHeader } from "@/components/cart/MarketHeader";
+import { TotalBanner } from "@/components/cart/TotalBanner";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { palette } from "@/constants/Colors";
+import { useCart } from "@/hooks/useCart";
 import { useTheme } from "@/hooks/useTheme";
+import { formatBRL } from "@/utils/currency";
+
+const SWIPE_BTN_WIDTH = 80;
 
 export default function CarrinhoScreen() {
   const { theme } = useTheme();
+  const {
+    loading,
+    sessaoAtiva,
+    mercadoAtivo,
+    itens,
+    totalAtual,
+    updateQuantity,
+    removeItem,
+    finalizeSession,
+    setBudget,
+  } = useCart();
+  const [budgetOpen, setBudgetOpen] = useState(false);
+
+  function handleAdjustQty(itemId: number, currentQty: number, delta: number) {
+    const next = currentQty + delta;
+    // Decrementar de 1 para 0 = remover (com confirmação leve via Alert).
+    if (next <= 0) {
+      Alert.alert(
+        "Remover item?",
+        "A quantidade chegará a zero. O item será removido do carrinho.",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Remover",
+            style: "destructive",
+            onPress: () => removeItem(itemId),
+          },
+        ]
+      );
+      return;
+    }
+    updateQuantity(itemId, next);
+  }
+
+  function handleFinalize() {
+    if (!sessaoAtiva || itens.length === 0) return;
+    Alert.alert(
+      "Finalizar compra?",
+      `Total: ${formatBRL(totalAtual)}\nEsta compra irá para o histórico.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Finalizar",
+          style: "default",
+          onPress: async () => {
+            await finalizeSession();
+          },
+        },
+      ]
+    );
+  }
+
+  if (loading) {
+    return (
+      <Screen>
+        <ScreenHeader title="Carrinho" right={<ThemeToggle />} showSettings />
+      </Screen>
+    );
+  }
+
+  // Sem mercado selecionado / sem sessão ativa.
+  if (!sessaoAtiva || !mercadoAtivo) {
+    return (
+      <Screen>
+        <ScreenHeader title="Carrinho" right={<ThemeToggle />} showSettings />
+        <EmptyState
+          icon="storefront-outline"
+          title="Selecione um mercado"
+          description="Para começar a registrar o que você está comprando, escolha em qual supermercado você está."
+          actionLabel="Escolher mercado"
+          onAction={() => router.push("/modals/market-select")}
+        />
+      </Screen>
+    );
+  }
 
   return (
-    <Screen>
-      <ScreenHeader
-        title="Carrinho"
-        subtitle="Selecione um mercado para começar"
-        right={<ThemeToggle />}
-        showSettings
-      />
-
-      <View style={styles.placeholder}>
-        <Text style={[styles.placeholderTitle, { color: theme.text }]}>
-          Em construção
-        </Text>
-        <Text style={[styles.placeholderText, { color: theme.textMuted }]}>
-          O carrinho com itens, total e orçamento será implementado no Stage 3.
-        </Text>
+    <Screen padded={false}>
+      <View style={styles.headerArea}>
+        <ScreenHeader title="Carrinho" right={<ThemeToggle />} showSettings />
+        <View style={styles.stack}>
+          <MarketHeader mercado={mercadoAtivo} dataCompra={sessaoAtiva.data} />
+          <TotalBanner
+            total={totalAtual}
+            quantidadeItens={itens.length}
+            orcamento={sessaoAtiva.orcamento}
+            onPressBudget={() => setBudgetOpen(true)}
+          />
+        </View>
       </View>
+
+      {itens.length === 0 ? (
+        <EmptyState
+          icon="cart-outline"
+          title="Carrinho vazio"
+          description="Escaneie uma etiqueta de preço ou adicione um produto manualmente."
+          actionLabel="Adicionar item"
+          onAction={() => router.push("/modals/add-item")}
+        />
+      ) : (
+        <SwipeListView
+          data={itens}
+          keyExtractor={(it) => String(it.id)}
+          renderItem={({ item }) => (
+            <View style={styles.itemWrap}>
+              <CartItem
+                item={item}
+                onIncrease={() =>
+                  handleAdjustQty(item.id, item.quantidade, +1)
+                }
+                onDecrease={() =>
+                  handleAdjustQty(item.id, item.quantidade, -1)
+                }
+              />
+            </View>
+          )}
+          renderHiddenItem={({ item }) => (
+            <View
+              style={[
+                styles.hiddenRow,
+                { backgroundColor: "#e63946", borderColor: theme.border },
+              ]}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={20}
+                color={palette.white}
+              />
+              <Text style={styles.hiddenLabel}>Remover</Text>
+            </View>
+          )}
+          rightOpenValue={-SWIPE_BTN_WIDTH}
+          disableRightSwipe
+          // Ao soltar com swipe completo, executa a remoção
+          onRowDidOpen={(rowKey) => {
+            const id = Number(rowKey);
+            if (Number.isFinite(id)) removeItem(id);
+          }}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+
+      <View
+        style={[
+          styles.footer,
+          { backgroundColor: theme.surface, borderTopColor: theme.border },
+        ]}
+      >
+        <View style={styles.footerRow}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Escanear"
+              icon="scan-outline"
+              onPress={() => router.push("/scan")}
+              fullWidth
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Adicionar"
+              icon="add-circle-outline"
+              variant="ghost"
+              onPress={() => router.push("/modals/add-item")}
+              fullWidth
+            />
+          </View>
+        </View>
+        {itens.length > 0 ? (
+          <Button
+            label="Finalizar compra"
+            icon="checkmark-circle-outline"
+            variant="ghost"
+            onPress={handleFinalize}
+            fullWidth
+          />
+        ) : null}
+      </View>
+
+      <BudgetModal
+        visible={budgetOpen}
+        currentValue={sessaoAtiva.orcamento}
+        onClose={() => setBudgetOpen(false)}
+        onSave={setBudget}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  placeholder: {
-    flex: 1,
+  headerArea: { paddingHorizontal: 16, paddingTop: 8 },
+  stack: { gap: 12, marginTop: 8 },
+  itemWrap: { paddingHorizontal: 16, marginBottom: 8 },
+  hiddenRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
+    justifyContent: "flex-end",
+    gap: 6,
+    paddingRight: 28,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    height: "100%",
+    borderRadius: 14,
   },
-  placeholderTitle: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
-  placeholderText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  hiddenLabel: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  listContent: { paddingTop: 12, paddingBottom: 12 },
+  footer: {
+    padding: 12,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  footerRow: { flexDirection: "row", gap: 10 },
 });

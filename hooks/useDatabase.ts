@@ -9,7 +9,6 @@ import { useEffect, useState } from "react";
 
 import { getDb } from "@/database/db";
 import { runSeed } from "@/database/seed";
-import { runSanityCheck } from "@/database/__sanity_check";
 
 interface UseDatabaseResult {
   ready: boolean;
@@ -28,10 +27,6 @@ export function useDatabase(): UseDatabaseResult {
         // getDb() já abre conexão e roda as migrations.
         await getDb();
         await runSeed();
-
-        if (__DEV__) {
-          await runSanityCheck();
-        }
 
         if (!cancelled) setReady(true);
       } catch (err) {
