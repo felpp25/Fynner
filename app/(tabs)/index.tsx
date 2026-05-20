@@ -17,7 +17,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SwipeListView } from "react-native-swipe-list-view";
 
 import { BudgetModal } from "@/components/cart/BudgetModal";
@@ -29,7 +29,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { palette } from "@/constants/Colors";
 import { useCart } from "@/hooks/useCart";
 import { useTheme } from "@/hooks/useTheme";
 import { formatBRL } from "@/utils/currency";
@@ -155,27 +154,24 @@ export default function CarrinhoScreen() {
             </View>
           )}
           renderHiddenItem={({ item }) => (
-            <View
-              style={[
-                styles.hiddenRow,
-                { backgroundColor: "#e63946", borderColor: theme.border },
-              ]}
-            >
-              <Ionicons
-                name="trash-outline"
-                size={20}
-                color={palette.white}
-              />
-              <Text style={styles.hiddenLabel}>Remover</Text>
+            <View style={styles.hiddenWrap}>
+              <View style={styles.hiddenRow}>
+                <TouchableOpacity
+                  style={styles.deleteAction}
+                  onPress={() => removeItem(item.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#ff6b9d" />
+                  <Text style={styles.deleteText}>Remover</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           rightOpenValue={-SWIPE_BTN_WIDTH}
           disableRightSwipe
-          // Ao soltar com swipe completo, executa a remoção
-          onRowDidOpen={(rowKey) => {
-            const id = Number(rowKey);
-            if (Number.isFinite(id)) removeItem(id);
-          }}
+          closeOnRowOpen
+          tension={40}
+          friction={8}
           contentContainerStyle={styles.listContent}
         />
       )}
@@ -209,7 +205,7 @@ export default function CarrinhoScreen() {
           <Button
             label="Finalizar compra"
             icon="checkmark-circle-outline"
-            variant="ghost"
+            variant="danger"
             onPress={handleFinalize}
             fullWidth
           />
@@ -229,19 +225,33 @@ export default function CarrinhoScreen() {
 const styles = StyleSheet.create({
   headerArea: { paddingHorizontal: 16, paddingTop: 8 },
   stack: { gap: 12, marginTop: 8 },
+
+  // Front e Hidden compartilham o mesmo paddingHorizontal para que
+  // o fundo rosa fique perfeitamente alinhado com o card roxo.
   itemWrap: { paddingHorizontal: 16, marginBottom: 8 },
+  hiddenWrap: { paddingHorizontal: 16, marginBottom: 8, flex: 1 },
   hiddenRow: {
+    flex: 1,
+    backgroundColor: "#1a0010", // rosa-crimson bg
+    borderRadius: 14,
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "flex-end",
-    gap: 6,
-    paddingRight: 28,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    alignItems: "center",
+  },
+  deleteAction: {
+    width: SWIPE_BTN_WIDTH,
     height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 4,
     borderRadius: 14,
   },
-  hiddenLabel: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  deleteText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#ff6b9d",
+  },
+
   listContent: { paddingTop: 12, paddingBottom: 12 },
   footer: {
     padding: 12,

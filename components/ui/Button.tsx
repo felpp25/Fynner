@@ -46,10 +46,12 @@ export function Button({
       text: palette.accentLight,
       border: theme.border,
     },
+    // Rosa-crimson outline: ação destrutiva/encerramento, sem quebrar o clima roxo.
+    // Mesma cor usada no swipe-delete do CartItem.
     danger: {
-      bg: "#e63946",
-      text: palette.white,
-      border: "#e63946",
+      bg: "rgba(255, 107, 157, 0.08)",
+      text: "#ff6b9d",
+      border: "rgba(255, 107, 157, 0.30)",
     },
   }[variant];
 
