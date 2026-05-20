@@ -16,12 +16,14 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
+import { palette } from "@/constants/Colors";
 import { CartProvider } from "@/context/CartContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { useDatabase } from "@/hooks/useDatabase";
 import { useTheme } from "@/hooks/useTheme";
 
 export { ErrorBoundary } from "expo-router";
@@ -64,11 +66,40 @@ export default function RootLayout() {
 }
 
 /**
- * Stack interno — separado para poder consumir o tema.
+ * Stack interno — separado para poder consumir o tema e inicializar o DB.
  * O ThemeProvider precisa estar acima na árvore.
+ *
+ * Enquanto o banco não está pronto, mostramos um spinner. Se der erro,
+ * mostramos uma mensagem (sem nav). Esse caminho de erro só dispara em
+ * casos catastróficos (disco cheio, permissão negada) — o app não fica
+ * inutilizável silenciosamente.
  */
 function ThemedStack() {
   const { theme, mode } = useTheme();
+  const { ready, error } = useDatabase();
+
+  if (error) {
+    return (
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <StatusBar style={mode === "dark" ? "light" : "dark"} />
+        <Text style={[styles.errorTitle, { color: theme.text }]}>
+          Não foi possível iniciar o banco de dados
+        </Text>
+        <Text style={[styles.errorMsg, { color: theme.textMuted }]}>
+          {error.message}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
+        <StatusBar style={mode === "dark" ? "light" : "dark"} />
+        <ActivityIndicator size="large" color={palette.accent} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -93,3 +124,14 @@ function ThemedStack() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  errorTitle: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
+  errorMsg: { fontSize: 13, textAlign: "center" },
+});
