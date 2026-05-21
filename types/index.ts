@@ -12,6 +12,11 @@ export interface Mercado {
   endereco?: string;
   cor: string;
   created_at: string;
+  /**
+   * Data ISO (YYYY-MM-DD) da última compra finalizada neste mercado.
+   * Vem do LEFT JOIN em getAllMarkets — `undefined` se nunca houve compra.
+   */
+  ultima_visita?: string;
 }
 
 export interface Compra {

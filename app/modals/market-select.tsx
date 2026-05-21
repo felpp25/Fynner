@@ -9,6 +9,7 @@
  *   1. Retoma sessão ativa naquele mercado se existir
  *   2. Caso contrário, cria nova sessão ativa
  */
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -40,6 +41,16 @@ const MARKET_COLORS = [
   "#2a9d8f",
 ];
 
+/** Formata "YYYY-MM-DD" para "DD MMM" em português, ex: "20 mai". */
+function formatLastVisit(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
 export default function MarketSelectModal() {
   const { theme } = useTheme();
   const { selectMarket } = useCart();
@@ -49,6 +60,17 @@ export default function MarketSelectModal() {
   const [showForm, setShowForm] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [corSelecionada, setCorSelecionada] = useState(MARKET_COLORS[0]);
+
+  // Estado da confirmação de delete — a sheet em si vem na Etapa 2.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [marketToDelete, setMarketToDelete] = useState<Mercado | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showDeleteSheet, setShowDeleteSheet] = useState(false);
+
+  function handleDeletePress(mercado: Mercado) {
+    setMarketToDelete(mercado);
+    setShowDeleteSheet(true);
+  }
 
   useEffect(() => {
     (async () => {
@@ -130,9 +152,28 @@ export default function MarketSelectModal() {
               />
             }
             title={item.nome}
-            subtitle={item.endereco}
+            subtitle={
+              item.ultima_visita
+                ? `Última visita: ${formatLastVisit(item.ultima_visita)}`
+                : "Nenhuma compra ainda"
+            }
             showArrow
             onPress={() => handleSelect(item.id)}
+            rightContent={
+              <Pressable
+                onPress={() => handleDeletePress(item)}
+                // Faz o toque parar aqui — sem isso, o Pressable do ListRow
+                // recebia o evento e selecionava o mercado por acidente.
+                onStartShouldSetResponder={() => true}
+                accessibilityLabel={`Apagar ${item.nome}`}
+                style={({ pressed }) => [
+                  styles.deleteBtn,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Ionicons name="trash-outline" size={13} color="#ff6b9d" />
+              </Pressable>
+            }
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
@@ -215,4 +256,14 @@ const styles = StyleSheet.create({
   },
   colorRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   colorPick: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },
+  deleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#1a0010",
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 107, 157, 0.30)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

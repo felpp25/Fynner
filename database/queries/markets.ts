@@ -7,12 +7,29 @@
 import { getDb } from "../db";
 import type { Mercado, MarketComparison } from "@/types";
 
-/** Lista todos os mercados cadastrados, mais recentes primeiro. */
+/**
+ * Lista todos os mercados cadastrados, mais recentes primeiro.
+ * Inclui `ultima_visita` (data da última compra finalizada) via LEFT JOIN —
+ * vem como string vazia quando o mercado nunca teve compra; convertemos
+ * para `undefined` para o consumidor lidar de forma idiomática em TS.
+ */
 export async function getAllMarkets(): Promise<Mercado[]> {
   const db = await getDb();
-  return db.getAllAsync<Mercado>(
-    "SELECT * FROM mercados ORDER BY created_at DESC"
-  );
+  const rows = await db.getAllAsync<Mercado & { ultima_visita: string }>(`
+    SELECT
+      m.*,
+      COALESCE(
+        (SELECT MAX(c.data) FROM compras c
+         WHERE c.mercado_id = m.id AND c.status = 'finalizada'),
+        ''
+      ) AS ultima_visita
+    FROM mercados m
+    ORDER BY m.created_at DESC
+  `);
+  return rows.map((r) => ({
+    ...r,
+    ultima_visita: r.ultima_visita || undefined,
+  }));
 }
 
 /** Busca um mercado por id. Retorna null se não existir. */
