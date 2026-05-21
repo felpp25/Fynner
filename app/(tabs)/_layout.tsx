@@ -1,13 +1,12 @@
 /**
- * Tab bar do Fynner — 5 abas: Carrinho, Scan, IA, Histórico, Lista.
+ * Tab bar do Fynner — tab bar nativa fixa no rodapé com 5 abas:
+ * Carrinho · Scan · Fynner IA · Histórico · Lista.
  *
- * Os ícones são do Ionicons. A cor ativa é o accent roxo do app.
  * As cores do fundo e bordas são puxadas do tema ativo (dark/light).
  */
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
-import { palette } from "@/constants/Colors";
 import { useTheme } from "@/hooks/useTheme";
 
 export default function TabsLayout() {
@@ -17,24 +16,25 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: palette.accent,
-        tabBarInactiveTintColor: theme.textMuted,
         tabBarStyle: {
           backgroundColor: theme.surface,
-          borderTopColor: theme.border,
-          borderTopWidth: 1,
+          borderTopWidth: 0.5,
+          borderTopColor: theme.accentBorder,
+          height: 62,
+          paddingBottom: 10,
+          paddingTop: 7,
         },
-        tabBarLabelStyle: {
-          fontSize: 11,
-        },
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.textMuted,
+        tabBarLabelStyle: { fontSize: 9, fontWeight: "500" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Carrinho",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cart-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="cart-outline" size={20} color={color} />
           ),
         }}
       />
@@ -42,8 +42,8 @@ export default function TabsLayout() {
         name="scan"
         options={{
           title: "Scan",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="scan-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="scan-outline" size={20} color={color} />
           ),
         }}
       />
@@ -51,8 +51,8 @@ export default function TabsLayout() {
         name="ai"
         options={{
           title: "Fynner IA",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="sparkles-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="sparkles-outline" size={20} color={color} />
           ),
         }}
       />
@@ -60,8 +60,8 @@ export default function TabsLayout() {
         name="history"
         options={{
           title: "Histórico",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="time-outline" size={20} color={color} />
           ),
         }}
       />
@@ -69,8 +69,8 @@ export default function TabsLayout() {
         name="list"
         options={{
           title: "Lista",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list-outline" size={size} color={color} />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="list-outline" size={20} color={color} />
           ),
         }}
       />
