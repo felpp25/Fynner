@@ -1,8 +1,10 @@
 /**
- * Botão padronizado do Fynner. Dois estilos:
+ * Botão padronizado do Fynner. Três estilos:
  * - primary: fundo accent roxo, texto branco. Para CTAs principais.
  * - ghost:   fundo card, texto accentLight. Para ações secundárias.
- * - danger:  fundo vermelho. Para ações destrutivas.
+ * - danger:  outline rosa-crimson (#ff6b9d sobre fundo translúcido).
+ *            Mesma cor do swipe-delete do CartItem — usado em ações
+ *            destrutivas e em "Finalizar compra" para fechar a sessão.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { ComponentProps } from "react";
