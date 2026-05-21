@@ -333,3 +333,19 @@ qualquer tela nova ou alterar componentes visuais:
 
 - ScrollView horizontal com círculos de 32px
 - Selecionado: `borderWidth:2.5 borderColor:'#fff'` + ponto branco central (10px)
+
+Verde (rgba(80, 220, 100, 0.85)) foi introduzido no Stage 4 como cor de indicador positivo.
+Uso restrito a:
+
+Delta positivo em métricas (gastou menos, fez menos compras desnecessárias)
+Badge "mais barato" no comparativo de mercados
+Qualquer indicador visual de "isso é uma boa notícia"
+
+Variantes:
+
+successFg: rgba(80, 220, 100, 0.85) — ícone e texto
+successBg: rgba(80, 220, 100, 0.12) — fundo de badge
+successBorder: rgba(80, 220, 100, 0.30) — borda de badge
+
+Nunca usar verde em botões de ação primária — botão primário é sempre roxo #a203ff.
+Verde é leitura, não ação.
