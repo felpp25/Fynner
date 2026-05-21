@@ -1,31 +1,28 @@
 /**
  * Modal de seleção de mercado.
  *
- * - Lista os mercados cadastrados como `ListRow` (toque seleciona e fecha)
- * - Formulário inline no rodapé para criar um novo mercado
- * - `ActionBar` no fim — alterna entre "Novo mercado" (idle) e "Cancelar / Criar" (form aberto)
+ * - Mercados renderizados como `MarketRow` em `SwipeListView` (swipe-left
+ *   revela "Apagar" — padrão idêntico ao CartItem dos produtos).
+ * - "Novo mercado" abre o `NewMarketSheet` (bottom sheet acima do teclado).
+ * - Tocar "Apagar" abre o `DeleteMarketSheet` (soft / hard / cancel).
  *
- * Selecionar um mercado faz duas coisas (via CartContext.selectMarket):
- *   1. Retoma sessão ativa naquele mercado se existir
- *   2. Caso contrário, cria nova sessão ativa
+ * Header desta tela vem do Stack root (`title: "Mercado"`, `presentation:
+ * "modal"`) — por isso aqui não usamos `ScreenHeader` (duplicaria).
+ *
+ * Recarrega o `useCart` após qualquer delete: caso a sessão ativa fosse
+ * deste mercado e o hard delete tenha apagado as compras, o carrinho
+ * precisa se atualizar.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
+import { SwipeListView } from "react-native-swipe-list-view";
 
 import { DeleteMarketSheet } from "@/components/market/DeleteMarketSheet";
-import { ActionBar, type ActionBarButton } from "@/components/ui/ActionBar";
-import { ListRow } from "@/components/ui/ListRow";
-import { palette } from "@/constants/Colors";
+import { MarketRow } from "@/components/market/MarketRow";
+import { NewMarketSheet } from "@/components/market/NewMarketSheet";
+import { ActionBar } from "@/components/ui/ActionBar";
 import {
   createMarket,
   getAllMarkets,
@@ -36,39 +33,18 @@ import { useCart } from "@/hooks/useCart";
 import { useTheme } from "@/hooks/useTheme";
 import type { Mercado } from "@/types";
 
-// Cores sugeridas para identificar mercados visualmente.
-const MARKET_COLORS = [
-  "#a203ff",
-  "#e63946",
-  "#1d3557",
-  "#f4a261",
-  "#06d6a0",
-  "#ffba08",
-  "#2a9d8f",
-];
-
-/** Formata "YYYY-MM-DD" para "DD MMM" em português, ex: "20 mai". */
-function formatLastVisit(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
-  return new Date(y, m - 1, d).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  });
-}
-
-export default function MarketSelectModal() {
+export default function MarketSelectScreen() {
   const { theme } = useTheme();
   const { selectMarket, reload: reloadCart } = useCart();
-  const [mercados, setMercados] = useState<Mercado[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [novoNome, setNovoNome] = useState("");
-  const [corSelecionada, setCorSelecionada] = useState(MARKET_COLORS[0]);
 
+  const [mercados, setMercados] = useState<Mercado[]>([]);
   const [marketToDelete, setMarketToDelete] = useState<Mercado | null>(null);
   const [showDeleteSheet, setShowDeleteSheet] = useState(false);
+  const [showNewSheet, setShowNewSheet] = useState(false);
+
+  useEffect(() => {
+    loadMarkets();
+  }, []);
 
   async function loadMarkets() {
     try {
@@ -76,17 +52,11 @@ export default function MarketSelectModal() {
       setMercados(all);
     } catch (err) {
       console.error("[market-select] falha ao listar:", err);
-    } finally {
-      setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadMarkets();
-  }, []);
-
-  async function handleSelect(mercadoId: number) {
-    await selectMarket(mercadoId);
+  async function handleSelectMarket(mercado: Mercado) {
+    await selectMarket(mercado.id);
     router.back();
   }
 
@@ -103,163 +73,99 @@ export default function MarketSelectModal() {
   async function handleKeepHistory(mercadoId: number) {
     await softDeleteMarket(mercadoId);
     await loadMarkets();
-    // O carrinho pode estar referenciando este mercado; sincroniza pra que o
-    // header do carrinho reflita a remoção (sessão ativa permanece, só sai
-    // da lista de seleção).
+    // Sessão ativa continua existindo após soft delete; reloadCart
+    // garante que o header do carrinho exiba o mercado correto caso
+    // tenha mudado.
     await reloadCart();
   }
 
   async function handleDeleteAll(mercadoId: number) {
     await hardDeleteMarket(mercadoId);
     await loadMarkets();
-    // Hard delete apaga compras inclusive a sessão ativa — o carrinho
-    // precisa recarregar para detectar que não há mais sessão.
+    // Hard delete pode ter apagado a sessão ativa — sem reloadCart
+    // o carrinho referenciaria uma sessão que não existe mais.
     await reloadCart();
   }
 
-  async function handleCreate() {
-    const nome = novoNome.trim();
-    if (!nome) return;
-    setCreating(true);
-    try {
-      const id = await createMarket(nome, { cor: corSelecionada });
-      await selectMarket(id);
-      router.back();
-    } catch (err) {
-      console.error("[market-select] falha ao criar:", err);
-    } finally {
-      setCreating(false);
-    }
+  async function handleCreateMarket(nome: string, cor: string) {
+    // createMarket aceita (nome, options) — não inverter pra (nome, cor).
+    const id = await createMarket(nome, { cor });
+    await loadMarkets();
+    // Selecionar o mercado recém-criado e fechar este modal de seleção.
+    await selectMarket(id);
+    router.back();
   }
 
-  const actionButtons: ActionBarButton[] = showForm
-    ? [
-        {
-          label: "Cancelar",
-          icon: "close",
-          variant: "ghost",
-          onPress: () => {
-            setShowForm(false);
-            setNovoNome("");
-          },
-        },
-        {
-          label: "Criar",
-          icon: "checkmark",
-          variant: "primary",
-          onPress: handleCreate,
-          disabled: !novoNome.trim() || creating,
-        },
-      ]
-    : [
-        {
-          label: "Novo mercado",
-          icon: "add-circle-outline",
-          variant: "primary",
-          onPress: () => setShowForm(true),
-        },
-      ];
-
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <FlatList
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <SwipeListView
         data={mercados}
-        keyExtractor={(m) => String(m.id)}
-        renderItem={({ item }) => (
-          <ListRow
-            leftCustom={
-              <View
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  backgroundColor: item.cor,
-                  flexShrink: 0,
-                }}
-              />
-            }
-            title={item.nome}
-            subtitle={
-              item.ultima_visita
-                ? `Última visita: ${formatLastVisit(item.ultima_visita)}`
-                : "Nenhuma compra ainda"
-            }
-            showArrow
-            onPress={() => handleSelect(item.id)}
-            rightContent={
-              <Pressable
-                onPress={() => handleDeletePress(item)}
-                // Faz o toque parar aqui — sem isso, o Pressable do ListRow
-                // recebia o evento e selecionava o mercado por acidente.
-                onStartShouldSetResponder={() => true}
-                accessibilityLabel={`Apagar ${item.nome}`}
-                style={({ pressed }) => [
-                  styles.deleteBtn,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Ionicons name="trash-outline" size={13} color="#ff6b9d" />
-              </Pressable>
-            }
-          />
-        )}
+        keyExtractor={(m) => m.id.toString()}
+        contentContainerStyle={{ padding: 14, paddingBottom: 90 }}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        ListHeaderComponent={
-          loading ? (
-            <View style={styles.loading}>
-              <ActivityIndicator color={palette.accent} />
-            </View>
-          ) : null
-        }
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          !loading ? (
-            <Text style={[styles.empty, { color: theme.textMuted }]}>
-              Nenhum mercado cadastrado ainda. Crie o primeiro abaixo.
-            </Text>
-          ) : null
+          <Text
+            style={{
+              padding: 24,
+              textAlign: "center",
+              fontSize: 13,
+              color: theme.textMuted,
+            }}
+          >
+            Nenhum mercado cadastrado ainda. Crie o primeiro abaixo.
+          </Text>
         }
-        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
+          <MarketRow mercado={item} onPress={() => handleSelectMarket(item)} />
+        )}
+        renderHiddenItem={({ item }) => (
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "#1a0010",
+              borderRadius: 14,
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => handleDeletePress(item)}
+              accessibilityLabel={`Apagar ${item.nome}`}
+              style={{
+                width: 80,
+                height: "100%",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#ff6b9d" />
+              <Text style={{ fontSize: 11, fontWeight: "500", color: "#ff6b9d" }}>
+                Apagar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        rightOpenValue={-80}
+        disableRightSwipe
+        closeOnRowOpen
+        closeOnRowPress
+        tension={40}
+        friction={8}
       />
 
-      {showForm ? (
-        <View style={[styles.formArea, { backgroundColor: theme.surface }]}>
-          <TextInput
-            value={novoNome}
-            onChangeText={setNovoNome}
-            placeholder="Nome do mercado"
-            placeholderTextColor={theme.textHint}
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.card,
-                borderColor: theme.border,
-                color: theme.text,
-              },
-            ]}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={handleCreate}
-          />
-          <View style={styles.colorRow}>
-            {MARKET_COLORS.map((c) => (
-              <Pressable
-                key={c}
-                onPress={() => setCorSelecionada(c)}
-                style={[
-                  styles.colorPick,
-                  {
-                    backgroundColor: c,
-                    borderColor:
-                      c === corSelecionada ? theme.text : "transparent",
-                  },
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
-
-      <ActionBar buttons={actionButtons} />
+      <ActionBar
+        buttons={[
+          {
+            label: "Novo mercado",
+            icon: "add-circle-outline",
+            variant: "primary",
+            onPress: () => setShowNewSheet(true),
+          },
+        ]}
+      />
 
       <DeleteMarketSheet
         mercado={marketToDelete}
@@ -268,37 +174,12 @@ export default function MarketSelectModal() {
         onKeepHistory={handleKeepHistory}
         onDeleteAll={handleDeleteAll}
       />
+
+      <NewMarketSheet
+        visible={showNewSheet}
+        onClose={() => setShowNewSheet(false)}
+        onConfirm={handleCreateMarket}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  listContent: { padding: 14 },
-  loading: { padding: 16, alignItems: "center" },
-  empty: { padding: 24, textAlign: "center", fontSize: 13 },
-  formArea: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  input: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    fontSize: 15,
-  },
-  colorRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  colorPick: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },
-  deleteBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: "#1a0010",
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 107, 157, 0.30)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});
