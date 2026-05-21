@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FilterSheet, type HistoryFilters } from "@/components/history/FilterSheet";
 import { InsightCard } from "@/components/history/InsightCard";
@@ -36,6 +37,7 @@ const DEFAULT_FILTERS: HistoryFilters = { periodo: "mes", mercadoId: null };
 export default function HistoryScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [compras, setCompras] = useState<CompraComMercado[]>([]);
   const [mercados, setMercados] = useState<Mercado[]>([]);
@@ -104,7 +106,13 @@ export default function HistoryScreen() {
   const comprasDelta = stats ? stats.comprasAtuais - stats.comprasAnteriores : 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.background,
+        paddingTop: insets.top,
+      }}
+    >
       {/* Header */}
       <View
         style={{
