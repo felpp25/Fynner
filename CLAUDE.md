@@ -26,7 +26,8 @@ Features principais:
 
 ## 2. Status atual
 
-**Branch `dev` (trabalho do dia a dia)** — último commit `f22cf07` (UI fix).
+**Branch `dev` (trabalho do dia a dia)** — último commit `6113f46` (ActionBar
+e padronização dos botões de rodapé, 2026-05-21).
 **Branch `main`** — `dd1e5d0` (Stage 1 estável; só recebe merge testado).
 
 | Stage | Status | Conteúdo |
@@ -34,6 +35,7 @@ Features principais:
 | 1 — Setup + tema | ✅ pronto | Expo SDK 54, NativeWind v4, dark/light com AsyncStorage, 5 skeletons |
 | 2 — SQLite | ✅ pronto | Schema, migrations, queries CRUD, seed em DEV, useDatabase hook |
 | 3 — Carrinho | ✅ pronto | CartContext real, MarketHeader, TotalBanner, CartItem com swipe-delete, 3 modais (market-select, add-item, item-detail), BudgetModal |
+| 3.5 — Design system | ✅ pronto | `IconBox`, `Card`, `SectionHeader`, `ListRow`, `ActionBar` + telas Carrinho/Mercado/Configurações refatoradas para usarem |
 | 4 — Histórico | ⏳ pendente | Compras passadas, comparativo de mercados, filtros |
 | 5 — Lista de compras | ⏳ pendente | Lista reutilizável com checkboxes |
 | 6 — Scanner OCR | ⏳ pendente | Câmera + ML Kit para ler etiquetas |
@@ -41,6 +43,14 @@ Features principais:
 | 8 — UI da IA | ⏳ pendente | Chat com respostas locais (banco) |
 | 9 — Integração IA real | ⏳ pendente | API definida quando o user escolher modelo |
 | 10 — Polish | ⏳ pendente | Onboarding, edge cases, animações |
+
+### Tentativas reprovadas (não repetir)
+
+- **2026-05-20:** redesign global com `AppHeader` (saudação personalizada),
+  `HeroCard` (gradiente roxo + valor enorme) e `FloatingTabBar` (pílula com
+  FAB central). Falhou no teste de celular — sobreposições, conflito com
+  empty state, header sem identidade. Voltamos ao `ScreenHeader` clássico,
+  tab bar nativa e bloco mercado + bloco total separados.
 
 ---
 
@@ -76,7 +86,7 @@ fynner/
 ├── app/                          ← rotas Expo Router
 │   ├── _layout.tsx               ← root: SafeArea + Theme + Cart providers + useDatabase
 │   ├── (tabs)/
-│   │   ├── _layout.tsx           ← tab bar com 5 abas
+│   │   ├── _layout.tsx           ← tab bar nativa, 5 abas (não criar tab bar flutuante)
 │   │   ├── index.tsx             ← Carrinho (Stage 3 — completo)
 │   │   ├── scan.tsx              ← skeleton (Stage 6)
 │   │   ├── ai.tsx                ← skeleton (Stages 8–9)
@@ -88,7 +98,9 @@ fynner/
 │   │   └── item-detail.tsx       ← histórico de preço do produto
 │   └── settings.tsx              ← modal de configurações
 ├── components/
-│   ├── ui/                       ← Button, EmptyState, Screen, ScreenHeader, ThemeToggle
+│   ├── ui/                       ← design system: IconBox, Card, SectionHeader,
+│   │                              ListRow, ActionBar, Button, EmptyState,
+│   │                              Screen, ScreenHeader, ThemeToggle
 │   └── cart/                     ← MarketHeader, TotalBanner, CartItem, BudgetModal
 ├── context/                      ← ThemeContext, CartContext
 ├── database/
@@ -113,6 +125,7 @@ fynner/
 
 ## 5. Convenções importantes
 
+### Código e domínio
 - **Português** para nomes de domínio (`Mercado`, `Compra`, `Produto`, `mercados`,
   `compras`). **Inglês** para nomes técnicos (`handler`, `callback`, `ref`).
 - Tema padrão é **dark**. Persiste em AsyncStorage com chave `@fynner/theme-mode`.
@@ -133,6 +146,24 @@ fynner/
   prefere código claro com comentário em decisão não óbvia, sem comentários
   óbvios tipo `// soma 1 ao contador`.
 
+### Design system — obrigatório
+- **Telas novas devem usar os componentes base de `components/ui/`** em vez
+  de montar layouts inline com `View + backgroundColor`. Os 5 essenciais:
+  - `IconBox` — quadrado tintado com ícone (`flexShrink:0` embutido)
+  - `Card` — container de bloco padrão (variante `highlighted` p/ card ativo)
+  - `SectionHeader` — rótulo "APARÊNCIA", "SOBRE" etc. em caixa alta
+  - `ListRow` — linha de lista padrão; centro tem `flex:1+minWidth:0`,
+    extremos têm `flexShrink:0`, `minHeight: 62`
+  - `ActionBar` — **única forma** de fazer barra de ação inferior. Aceita
+    1-3 botões com variantes `primary` / `ghost` / `danger`. Encapsula
+    o wrapper completo (background, paddings, borda superior).
+- `Button` continua existindo, mas só para CTAs isolados em cards/modais
+  (ex.: dentro do `EmptyState`). **Nunca usar `Button` em barra de rodapé** —
+  é `ActionBar` obrigatório.
+- Cor `#ff6b9d` (rosa-crimson) é exclusiva de ações destrutivas/finalizar.
+  Existe como variante `danger` do `ActionBar` e do `Button`.
+- Dark mode é o padrão. Light mode existe mas é alternado em Configurações.
+
 ---
 
 ## 6. Comandos essenciais
@@ -148,7 +179,7 @@ npx expo start --clear      # se o Metro estiver com cache antigo
 
 # Validar antes de commitar
 npx tsc --noEmit            # type-check
-npx expo-doctor             # verificações Expo (17/17 atualmente passam)
+npx expo-doctor             # verificações Expo
 
 # Git workflow (cada máquina)
 git pull                    # ao chegar
@@ -186,6 +217,17 @@ git push                    # ao sair
   (preserva trabalho do usuário em aberto).
 - **windows line endings**: o git mostra warnings de LF→CRLF ao stage. Pode
   ignorar — é o autocrlf do Windows.
+- **ActionBar usa cores hardcoded** (`#a203ff`, `#d6a5fa`, `#ff6b9d` e rgba
+  derivadas). Intencional — a hierarquia visual é fixa e independe do tema.
+  Não trocar por tokens do theme sem aprovação.
+- **ActionBar não tem `loading`**. Onde o `Button` antes mostrava spinner
+  via `loading=true`, combinar em `disabled: isLoading || !canSubmit`. Se
+  precisar de feedback forte, estender com `loading?: boolean` que renderiza
+  `ActivityIndicator` no lugar do ícone.
+- **Firewall do Windows** bloqueia 8081 em redes `Public`. Se o Expo Go
+  não conectar no celular, checar se a Wi-Fi está classificada como `Public`
+  no Windows e mudar para `Private` (requer Admin). Fallback que sempre
+  funciona: `npm start -- --tunnel`.
 
 ---
 
@@ -193,11 +235,12 @@ git push                    # ao sair
 
 Quando o user disser pra prosseguir, implementar:
 - `app/(tabs)/history.tsx` com:
-  - Card de resumo do mês (total + comparação com mês anterior)
+  - Card de resumo do mês (total + comparação com mês anterior) — usar `Card`
   - Comparativo de mercados (`getMarketComparison`) com badge no mais barato do mês
-  - Lista `SessionCard` das compras recentes (`getSessionHistory`) com badge
-    "Em andamento" para sessão ativa
+  - Lista de compras recentes (`getSessionHistory`) com badge "Em andamento"
+    para sessão ativa — usar `ListRow` (provavelmente com `subtitle` + `rightContent`)
   - Filtros: por mercado e por período (esta semana / este mês / últimos 3 meses)
+  - Se tiver botão de "Exportar histórico" no rodapé: `ActionBar` com 1 botão primary
 - Tocar produto no histórico → reaproveitar `app/modals/item-detail.tsx` já
   pronto. No Stage 4, adicionar gráfico de variação de preço (react-native-svg
   + dados do `getProductPriceHistory`).
@@ -209,9 +252,15 @@ Queries do banco para isso já existem em `database/queries/sessions.ts` e
 
 ## 9. Onde encontrar mais detalhes
 
-- Histórico de commits: `git log --oneline` — cada commit tem descrição do
-  que mudou em qual stage.
-- Memórias do Claude: `~/.claude/projects/c--Users-ti/memory/` (relevantes:
-  `project_fynner.md`, `fynner_stack.md`, `fynner_architecture.md`,
-  `user_profile.md`).
-- Repo: https://github.com/felpp25/Fynner (branches `main` e `dev`).
+- **Histórico de commits**: `git log --oneline` — cada commit tem descrição do
+  que mudou em qual stage. Os principais marcos:
+  - `dd1e5d0` — Stage 1 (setup + tema)
+  - `c77ef50` — Stage 2 (SQLite)
+  - `779ccc5` — Stage 3 (Carrinho)
+  - `f782140` — Design system base (IconBox/Card/SectionHeader/ListRow)
+  - `6113f46` — ActionBar + botões de rodapé padronizados
+- **Memórias do Claude na máquina local**:
+  `~/.claude/projects/<project-slug>/memory/`. Em PC novo essas memórias
+  começam vazias — este `CLAUDE.md` é o ponto de entrada do contexto e
+  basta lê-lo para retomar. Memórias vão se acumulando ao longo das sessões.
+- **Repo**: https://github.com/felpp25/Fynner (branches `main` e `dev`).
