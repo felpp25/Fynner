@@ -12,6 +12,7 @@ no supermercado em tempo real, **100% offline**. Resolve o problema de chegar
 no caixa e levar susto.
 
 Features principais:
+
 - Carrinho com itens, total atualizado e barra de orçamento (verde/amarelo/vermelho)
 - OCR de etiquetas de preço (Stage 6 — câmera + ML Kit)
 - Histórico por mercado e comparativo de preço entre supermercados
@@ -30,19 +31,19 @@ Features principais:
 e padronização dos botões de rodapé, 2026-05-21).
 **Branch `main`** — `dd1e5d0` (Stage 1 estável; só recebe merge testado).
 
-| Stage | Status | Conteúdo |
-|-------|--------|----------|
-| 1 — Setup + tema | ✅ pronto | Expo SDK 54, NativeWind v4, dark/light com AsyncStorage, 5 skeletons |
-| 2 — SQLite | ✅ pronto | Schema, migrations, queries CRUD, seed em DEV, useDatabase hook |
-| 3 — Carrinho | ✅ pronto | CartContext real, MarketHeader, TotalBanner, CartItem com swipe-delete, 3 modais (market-select, add-item, item-detail), BudgetModal |
-| 3.5 — Design system | ✅ pronto | `IconBox`, `Card`, `SectionHeader`, `ListRow`, `ActionBar` + telas Carrinho/Mercado/Configurações refatoradas para usarem |
-| 4 — Histórico | ⏳ pendente | Compras passadas, comparativo de mercados, filtros |
-| 5 — Lista de compras | ⏳ pendente | Lista reutilizável com checkboxes |
-| 6 — Scanner OCR | ⏳ pendente | Câmera + ML Kit para ler etiquetas |
-| 7 — Export/import CSV | ⏳ pendente | Backup do histórico |
-| 8 — UI da IA | ⏳ pendente | Chat com respostas locais (banco) |
-| 9 — Integração IA real | ⏳ pendente | API definida quando o user escolher modelo |
-| 10 — Polish | ⏳ pendente | Onboarding, edge cases, animações |
+| Stage                  | Status      | Conteúdo                                                                                                                             |
+| ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 — Setup + tema       | ✅ pronto   | Expo SDK 54, NativeWind v4, dark/light com AsyncStorage, 5 skeletons                                                                 |
+| 2 — SQLite             | ✅ pronto   | Schema, migrations, queries CRUD, seed em DEV, useDatabase hook                                                                      |
+| 3 — Carrinho           | ✅ pronto   | CartContext real, MarketHeader, TotalBanner, CartItem com swipe-delete, 3 modais (market-select, add-item, item-detail), BudgetModal |
+| 3.5 — Design system    | ✅ pronto   | `IconBox`, `Card`, `SectionHeader`, `ListRow`, `ActionBar` + telas Carrinho/Mercado/Configurações refatoradas para usarem            |
+| 4 — Histórico          | ⏳ pendente | Compras passadas, comparativo de mercados, filtros                                                                                   |
+| 5 — Lista de compras   | ⏳ pendente | Lista reutilizável com checkboxes                                                                                                    |
+| 6 — Scanner OCR        | ⏳ pendente | Câmera + ML Kit para ler etiquetas                                                                                                   |
+| 7 — Export/import CSV  | ⏳ pendente | Backup do histórico                                                                                                                  |
+| 8 — UI da IA           | ⏳ pendente | Chat com respostas locais (banco)                                                                                                    |
+| 9 — Integração IA real | ⏳ pendente | API definida quando o user escolher modelo                                                                                           |
+| 10 — Polish            | ⏳ pendente | Onboarding, edge cases, animações                                                                                                    |
 
 ### Tentativas reprovadas (não repetir)
 
@@ -56,20 +57,21 @@ e padronização dos botões de rodapé, 2026-05-21).
 
 ## 3. Stack — não trocar sem motivo
 
-| Camada | Tech | Observação |
-|--------|------|-----------|
-| Framework | Expo SDK 54 | `expo@~54.0.33` |
-| Navegação | Expo Router 6.x | file-based |
-| Estilização | NativeWind v4 | exige **Tailwind 3.4.x** (NÃO Tailwind 4) |
-| Banco | expo-sqlite | colunas geradas suportadas |
-| Estado | React Context + useReducer | sem Redux |
-| Storage prefs | @react-native-async-storage/async-storage `2.2.0` | versão é fixada pelo SDK 54 — `npx expo install` quando atualizar |
-| Tipagem | TypeScript strict | sem `any` explícito |
-| Câmera (Stage 6) | expo-camera + `@react-native-ml-kit/text-recognition` | já instalado |
-| Voz (Stage 8) | `@react-native-voice/voice` | a instalar |
-| Swipe-delete | `react-native-swipe-list-view` | já instalado |
+| Camada           | Tech                                                  | Observação                                                        |
+| ---------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| Framework        | Expo SDK 54                                           | `expo@~54.0.33`                                                   |
+| Navegação        | Expo Router 6.x                                       | file-based                                                        |
+| Estilização      | NativeWind v4                                         | exige **Tailwind 3.4.x** (NÃO Tailwind 4)                         |
+| Banco            | expo-sqlite                                           | colunas geradas suportadas                                        |
+| Estado           | React Context + useReducer                            | sem Redux                                                         |
+| Storage prefs    | @react-native-async-storage/async-storage `2.2.0`     | versão é fixada pelo SDK 54 — `npx expo install` quando atualizar |
+| Tipagem          | TypeScript strict                                     | sem `any` explícito                                               |
+| Câmera (Stage 6) | expo-camera + `@react-native-ml-kit/text-recognition` | já instalado                                                      |
+| Voz (Stage 8)    | `@react-native-voice/voice`                           | a instalar                                                        |
+| Swipe-delete     | `react-native-swipe-list-view`                        | já instalado                                                      |
 
 Configurações sutis:
+
 - **babel.config.js** usa `babel-preset-expo` com `jsxImportSource: "nativewind"`,
   preset `nativewind/babel`, e plugin `react-native-worklets/plugin` POR ÚLTIMO
   (Reanimated 4).
@@ -126,6 +128,7 @@ fynner/
 ## 5. Convenções importantes
 
 ### Código e domínio
+
 - **Português** para nomes de domínio (`Mercado`, `Compra`, `Produto`, `mercados`,
   `compras`). **Inglês** para nomes técnicos (`handler`, `callback`, `ref`).
 - Tema padrão é **dark**. Persiste em AsyncStorage com chave `@fynner/theme-mode`.
@@ -147,6 +150,7 @@ fynner/
   óbvios tipo `// soma 1 ao contador`.
 
 ### Design system — obrigatório
+
 - **Telas novas devem usar os componentes base de `components/ui/`** em vez
   de montar layouts inline com `View + backgroundColor`. Os 5 essenciais:
   - `IconBox` — quadrado tintado com ícone (`flexShrink:0` embutido)
@@ -187,6 +191,7 @@ git push                    # ao sair
 ```
 
 **Branches:**
+
 - `main` — estável, só recebe merge testado
 - `dev` — trabalho do dia a dia
 - `feature/*` — features longas (não usamos ainda — projeto está em modo
@@ -234,6 +239,7 @@ git push                    # ao sair
 ## 8. Próximo stage: 4 — Histórico
 
 Quando o user disser pra prosseguir, implementar:
+
 - `app/(tabs)/history.tsx` com:
   - Card de resumo do mês (total + comparação com mês anterior) — usar `Card`
   - Comparativo de mercados (`getMarketComparison`) com badge no mais barato do mês
@@ -243,7 +249,7 @@ Quando o user disser pra prosseguir, implementar:
   - Se tiver botão de "Exportar histórico" no rodapé: `ActionBar` com 1 botão primary
 - Tocar produto no histórico → reaproveitar `app/modals/item-detail.tsx` já
   pronto. No Stage 4, adicionar gráfico de variação de preço (react-native-svg
-  + dados do `getProductPriceHistory`).
+  - dados do `getProductPriceHistory`).
 
 Queries do banco para isso já existem em `database/queries/sessions.ts` e
 `markets.ts` — só consumir.
@@ -264,3 +270,66 @@ Queries do banco para isso já existem em `database/queries/sessions.ts` e
   começam vazias — este `CLAUDE.md` é o ponto de entrada do contexto e
   basta lê-lo para retomar. Memórias vão se acumulando ao longo das sessões.
 - **Repo**: https://github.com/felpp25/Fynner (branches `main` e `dev`).
+
+---
+
+## 10. UI/UX — Workflow e referências
+
+### Fluxo obrigatório para qualquer alteração visual
+
+1. **Analisar** o problema (screenshot ajuda — descrever o que está errado)
+2. **Mockup** — gerar exemplo visual no claude.ai para aprovação **antes** de qualquer código
+3. **Aguardar aprovação** — nunca escrever código de UI sem o design confirmado
+4. **Implementar** — prompt detalhado com código completo, ordem de execução e checklist
+5. **Validar no celular** via Expo Go antes de commitar
+
+> Regra de ouro: design aprovado primeiro, código depois. Nunca ao contrário.
+
+### Tentativa reprovada — não repetir (registrada na Seção 2)
+
+`AppHeader` + `HeroCard` + `FloatingTabBar` (pílula com FAB central).
+Testado em 2026-05-20 e reprovado. Causou sobreposições e conflito com empty state.
+A identidade visual aprovada usa: `ScreenHeader` clássico + tab bar nativa + bloco
+mercado separado do bloco total.
+
+### Referências de design
+
+Os arquivos abaixo contêm o design system completo. Ler antes de implementar
+qualquer tela nova ou alterar componentes visuais:
+
+@docs/uiux/design-tokens.md
+@docs/uiux/components.md
+@docs/uiux/patterns.md
+
+### Padrões visuais aprovados (resumo rápido)
+
+**CartItem (swipe-to-delete):**
+
+- Fundo de delete: `#1a0010` · ícone e texto: `#ff6b9d`
+- Layout: `[IconBox flexShrink:0]` `[flex:1 minWidth:0 nome+preço]` `[flexShrink:0 total+qtd]`
+- `rightOpenValue: -80` · `disableRightSwipe: true` · `closeOnRowOpen: true`
+
+**Bottom sheet (modais):**
+
+- `Modal animationType="slide"` + overlay `rgba(0,0,0,0.75)`
+- Handle: `width:36 height:4 borderRadius:2 background:rgba(214,165,250,0.25)`
+- `borderTopLeftRadius:22 borderTopRightRadius:22`
+- Tocar no overlay fecha o modal
+
+**Formulário com teclado (KeyboardAvoidingView):**
+
+- `behavior={Platform.OS === 'ios' ? 'padding' : 'height'}`
+- `autoFocus` no TextInput abre teclado automaticamente
+- Sheet sobe junto com o teclado — input nunca fica escondido
+
+**Confirmação de ação destrutiva:**
+
+- Sempre 2 opções além de Cancelar:
+  1. Soft delete (preserva histórico) — ícone roxo
+  2. Hard delete (apaga tudo) — ícone e texto `#ff6b9d`
+- Nunca só "Confirmar / Cancelar" para ações irreversíveis
+
+**Seletor de cor (mercados):**
+
+- ScrollView horizontal com círculos de 32px
+- Selecionado: `borderWidth:2.5 borderColor:'#fff'` + ponto branco central (10px)
