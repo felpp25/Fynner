@@ -6,13 +6,12 @@
  *   [MarketHeader]          → mercado ativo + data + trocar
  *   [TotalBanner]           → total + orçamento (toca para editar)
  *   [SwipeListView itens]   → cada item com +/− e swipe-esquerda pra deletar
- *   [Footer fixo]           → Escanear · Adicionar · Finalizar (variant=danger)
+ *   [ActionBar]             → Escanear (primary) · Adicionar (ghost) · Finalizar (danger)
  *
  * Comportamento:
  * - Se não há sessão ativa, mostra EmptyState com CTA "Selecionar mercado".
  * - Se há sessão mas zero itens, mostra EmptyState com CTA "Adicionar item".
- * - O total e a barra de orçamento atualizam em tempo real após cada ação
- *   (o CartContext recarrega tudo do banco após mutações).
+ * - O botão Finalizar fica desabilitado quando o carrinho está vazio.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -24,20 +23,18 @@ import { BudgetModal } from "@/components/cart/BudgetModal";
 import { CartItem } from "@/components/cart/CartItem";
 import { MarketHeader } from "@/components/cart/MarketHeader";
 import { TotalBanner } from "@/components/cart/TotalBanner";
-import { Button } from "@/components/ui/Button";
+import { ActionBar } from "@/components/ui/ActionBar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useCart } from "@/hooks/useCart";
-import { useTheme } from "@/hooks/useTheme";
 import type { ItemComProduto } from "@/types";
 import { formatBRL } from "@/utils/currency";
 
 const SWIPE_BTN_WIDTH = 80;
 
 export default function CarrinhoScreen() {
-  const { theme } = useTheme();
   const {
     loading,
     sessaoAtiva,
@@ -50,6 +47,7 @@ export default function CarrinhoScreen() {
     setBudget,
   } = useCart();
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const cartEmpty = itens.length === 0;
 
   function adjustQty(itemId: number, currentQty: number, delta: number) {
     const next = currentQty + delta;
@@ -81,7 +79,7 @@ export default function CarrinhoScreen() {
   }
 
   function handleFinalize() {
-    if (!sessaoAtiva || itens.length === 0) return;
+    if (!sessaoAtiva || cartEmpty) return;
     Alert.alert(
       "Finalizar compra?",
       `Total: ${formatBRL(totalAtual)}\nEsta compra irá para o histórico.`,
@@ -137,7 +135,7 @@ export default function CarrinhoScreen() {
         </View>
       </View>
 
-      {itens.length === 0 ? (
+      {cartEmpty ? (
         <EmptyState
           icon="cart-outline"
           title="Carrinho vazio"
@@ -183,41 +181,29 @@ export default function CarrinhoScreen() {
         />
       )}
 
-      <View
-        style={[
-          styles.footer,
-          { backgroundColor: theme.surface, borderTopColor: theme.border },
+      <ActionBar
+        buttons={[
+          {
+            label: "Escanear",
+            icon: "scan-outline",
+            variant: "primary",
+            onPress: () => router.push("/scan"),
+          },
+          {
+            label: "Adicionar",
+            icon: "add",
+            variant: "ghost",
+            onPress: () => router.push("/modals/add-item"),
+          },
+          {
+            label: "Finalizar",
+            icon: "checkmark-circle-outline",
+            variant: "danger",
+            onPress: handleFinalize,
+            disabled: cartEmpty,
+          },
         ]}
-      >
-        <View style={styles.footerRow}>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Escanear"
-              icon="scan-outline"
-              onPress={() => router.push("/scan")}
-              fullWidth
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Adicionar"
-              icon="add-circle-outline"
-              variant="ghost"
-              onPress={() => router.push("/modals/add-item")}
-              fullWidth
-            />
-          </View>
-        </View>
-        {itens.length > 0 ? (
-          <Button
-            label="Finalizar compra"
-            icon="checkmark-circle-outline"
-            variant="danger"
-            onPress={handleFinalize}
-            fullWidth
-          />
-        ) : null}
-      </View>
+      />
 
       <BudgetModal
         visible={budgetOpen}
@@ -233,13 +219,11 @@ const styles = StyleSheet.create({
   headerArea: { paddingHorizontal: 16, paddingTop: 8 },
   stack: { gap: 12, marginTop: 8 },
 
-  // Front e Hidden compartilham o mesmo paddingHorizontal e marginBottom
-  // para que o fundo rosa fique perfeitamente alinhado com o card roxo.
   itemWrap: { paddingHorizontal: 16, marginBottom: 8 },
   hiddenWrap: { paddingHorizontal: 16, marginBottom: 8, flex: 1 },
   hiddenRow: {
     flex: 1,
-    backgroundColor: "#1a0010", // rosa-crimson bg
+    backgroundColor: "#1a0010",
     borderRadius: 14,
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -258,12 +242,5 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#ff6b9d",
   },
-
   listContent: { paddingTop: 12, paddingBottom: 12 },
-  footer: {
-    padding: 12,
-    borderTopWidth: 1,
-    gap: 8,
-  },
-  footerRow: { flexDirection: "row", gap: 10 },
 });

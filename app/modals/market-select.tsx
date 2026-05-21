@@ -3,6 +3,7 @@
  *
  * - Lista os mercados cadastrados como `ListRow` (toque seleciona e fecha)
  * - Formulário inline no rodapé para criar um novo mercado
+ * - `ActionBar` no fim — alterna entre "Novo mercado" (idle) e "Cancelar / Criar" (form aberto)
  *
  * Selecionar um mercado faz duas coisas (via CartContext.selectMarket):
  *   1. Retoma sessão ativa naquele mercado se existir
@@ -20,7 +21,7 @@ import {
   View,
 } from "react-native";
 
-import { Button } from "@/components/ui/Button";
+import { ActionBar, type ActionBarButton } from "@/components/ui/ActionBar";
 import { ListRow } from "@/components/ui/ListRow";
 import { palette } from "@/constants/Colors";
 import { createMarket, getAllMarkets } from "@/database/queries/markets";
@@ -82,6 +83,34 @@ export default function MarketSelectModal() {
     }
   }
 
+  const actionButtons: ActionBarButton[] = showForm
+    ? [
+        {
+          label: "Cancelar",
+          icon: "close",
+          variant: "ghost",
+          onPress: () => {
+            setShowForm(false);
+            setNovoNome("");
+          },
+        },
+        {
+          label: "Criar",
+          icon: "checkmark",
+          variant: "primary",
+          onPress: handleCreate,
+          disabled: !novoNome.trim() || creating,
+        },
+      ]
+    : [
+        {
+          label: "Novo mercado",
+          icon: "add-circle-outline",
+          variant: "primary",
+          onPress: () => setShowForm(true),
+        },
+      ];
+
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <FlatList
@@ -124,80 +153,45 @@ export default function MarketSelectModal() {
         contentContainerStyle={styles.listContent}
       />
 
-      <View
-        style={[
-          styles.footer,
-          { backgroundColor: theme.surface, borderTopColor: theme.border },
-        ]}
-      >
-        {showForm ? (
-          <View style={styles.form}>
-            <TextInput
-              value={novoNome}
-              onChangeText={setNovoNome}
-              placeholder="Nome do mercado"
-              placeholderTextColor={theme.textHint}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                  color: theme.text,
-                },
-              ]}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleCreate}
-            />
-            <View style={styles.colorRow}>
-              {MARKET_COLORS.map((c) => (
-                <Pressable
-                  key={c}
-                  onPress={() => setCorSelecionada(c)}
-                  style={[
-                    styles.colorPick,
-                    {
-                      backgroundColor: c,
-                      borderColor:
-                        c === corSelecionada ? theme.text : "transparent",
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-            <View style={styles.formActions}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="Cancelar"
-                  variant="ghost"
-                  onPress={() => {
-                    setShowForm(false);
-                    setNovoNome("");
-                  }}
-                  fullWidth
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="Criar"
-                  onPress={handleCreate}
-                  disabled={!novoNome.trim()}
-                  loading={creating}
-                  fullWidth
-                />
-              </View>
-            </View>
-          </View>
-        ) : (
-          <Button
-            label="Novo mercado"
-            icon="add-circle-outline"
-            variant="ghost"
-            onPress={() => setShowForm(true)}
-            fullWidth
+      {showForm ? (
+        <View style={[styles.formArea, { backgroundColor: theme.surface }]}>
+          <TextInput
+            value={novoNome}
+            onChangeText={setNovoNome}
+            placeholder="Nome do mercado"
+            placeholderTextColor={theme.textHint}
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                color: theme.text,
+              },
+            ]}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleCreate}
           />
-        )}
-      </View>
+          <View style={styles.colorRow}>
+            {MARKET_COLORS.map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => setCorSelecionada(c)}
+                style={[
+                  styles.colorPick,
+                  {
+                    backgroundColor: c,
+                    borderColor:
+                      c === corSelecionada ? theme.text : "transparent",
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <ActionBar buttons={actionButtons} />
     </View>
   );
 }
@@ -207,8 +201,11 @@ const styles = StyleSheet.create({
   listContent: { padding: 14 },
   loading: { padding: 16, alignItems: "center" },
   empty: { padding: 24, textAlign: "center", fontSize: 13 },
-  footer: { padding: 12, borderTopWidth: 1 },
-  form: { gap: 10 },
+  formArea: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
   input: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -218,5 +215,4 @@ const styles = StyleSheet.create({
   },
   colorRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   colorPick: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },
-  formActions: { flexDirection: "row", gap: 10 },
 });

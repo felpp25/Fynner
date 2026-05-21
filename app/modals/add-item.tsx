@@ -26,7 +26,7 @@ import {
   View,
 } from "react-native";
 
-import { Button } from "@/components/ui/Button";
+import { ActionBar } from "@/components/ui/ActionBar";
 import { palette } from "@/constants/Colors";
 import { searchProducts } from "@/database/queries/products";
 import { useCart } from "@/hooks/useCart";
@@ -210,33 +210,23 @@ export default function AddItemModal() {
         </View>
       </View>
 
-      <View
-        style={[
-          styles.footer,
-          { backgroundColor: theme.surface, borderTopColor: theme.border },
+      <ActionBar
+        buttons={[
+          {
+            label: "Cancelar",
+            icon: "close",
+            variant: "ghost",
+            onPress: () => router.back(),
+          },
+          {
+            label: "Adicionar",
+            icon: "checkmark",
+            variant: "primary",
+            onPress: handleSave,
+            disabled: !podeSalvar || saving,
+          },
         ]}
-      >
-        <View style={styles.footerRow}>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Cancelar"
-              variant="ghost"
-              onPress={() => router.back()}
-              fullWidth
-            />
-          </View>
-          <View style={{ flex: 1.4 }}>
-            <Button
-              label="Adicionar"
-              icon="checkmark"
-              onPress={handleSave}
-              disabled={!podeSalvar}
-              loading={saving}
-              fullWidth
-            />
-          </View>
-        </View>
-      </View>
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -344,6 +334,4 @@ const styles = StyleSheet.create({
   },
   previewLabel: { fontSize: 11, letterSpacing: 1, fontWeight: "600" },
   previewValue: { fontSize: 20, fontWeight: "800" },
-  footer: { padding: 12, borderTopWidth: 1 },
-  footerRow: { flexDirection: "row", gap: 10 },
 });
