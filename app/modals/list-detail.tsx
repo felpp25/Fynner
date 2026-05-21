@@ -1,20 +1,23 @@
 /**
  * Tela de detalhe de uma lista (Stage 5).
  *
- * Mostra subheader com ícone, nome e progresso. Lista os itens divididos
- * em "Pendentes" e "Coletados" (label inline antes do primeiro item de
- * cada grupo). Toque alterna coletado; swipe-left remove.
+ * Layout:
+ *  - Subheader (ícone + nome + progresso) dentro de ScrollView pai
+ *  - Section "Pendentes (X)" + SwipeListView com scrollEnabled=false
+ *  - Section "Coletados (X)" + SwipeListView com scrollEnabled=false
  *
- * Sobre section labels no SwipeListView: o renderItem retorna o label
- * inline (Fragment) — quando o usuário arrasta o primeiro item de uma
- * seção, o fundo rosa cobre também o label. Se ficar ruim visualmente,
- * trocar por ScrollView + .map (perde o swipe, ganha layout limpo).
+ * Por que duas SwipeListView e ScrollView pai: a tentativa anterior
+ * colocava section labels DENTRO do renderItem, mas o SwipeListView trata
+ * a row inteira como swipeable — labels deslizavam junto com o item e o
+ * renderHiddenItem rebatia em qualquer linha do array (mostrando lixeira
+ * em headers). Separando, cada SwipeListView só conhece seus itens e o
+ * scroll fica unificado no ScrollView pai.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import type { ComponentProps } from "react";
 import { useCallback, useMemo, useState } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SwipeListView } from "react-native-swipe-list-view";
 
 import { ListItemRow } from "@/components/lists/ListItemRow";
@@ -113,202 +116,175 @@ export default function ListDetailScreen() {
     return <View style={{ flex: 1, backgroundColor: theme.background }} />;
   }
 
-  // Ordem visual: pendentes primeiro, coletados depois
-  const sortedItems = [...pendentes, ...coletados];
-
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Subheader: ícone + nome + progresso */}
-      <View
-        style={{ paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8 }}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 90 }}
+        showsVerticalScrollIndicator={false}
       >
+        {/* Subheader: ícone + nome + progresso */}
         <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 8,
-          }}
+          style={{ paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8 }}
         >
           <View
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              backgroundColor: theme.accentMid,
-              justifyContent: "center",
+              flexDirection: "row",
               alignItems: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Ionicons
-              name={lista.icone as IconName}
-              size={17}
-              color={theme.accentLight}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text
-              numberOfLines={1}
-              style={{ fontSize: 16, fontWeight: "600", color: theme.text }}
-            >
-              {lista.nome}
-            </Text>
-            <Text
-              style={{ fontSize: 10, color: theme.textMuted, marginTop: 1 }}
-            >
-              {itens.length === 0
-                ? "Sem itens"
-                : `${coletados.length} de ${itens.length} ${itens.length === 1 ? "item" : "itens"} coletados`}
-            </Text>
-          </View>
-        </View>
-
-        {itens.length > 0 ? (
-          <View
-            style={{
-              height: 6,
-              backgroundColor: "rgba(162, 3, 255, 0.12)",
-              borderRadius: 3,
-              overflow: "hidden",
+              gap: 10,
+              marginBottom: 8,
             }}
           >
             <View
               style={{
-                width: progressoPct,
-                height: "100%",
-                backgroundColor:
-                  progresso === 1
-                    ? "rgba(80, 220, 100, 0.85)"
-                    : theme.accent,
-                borderRadius: 3,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                backgroundColor: theme.accentMid,
+                justifyContent: "center",
+                alignItems: "center",
+                flexShrink: 0,
               }}
-            />
+            >
+              <Ionicons
+                name={lista.icone as IconName}
+                size={17}
+                color={theme.accentLight}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: 16, fontWeight: "600", color: theme.text }}
+              >
+                {lista.nome}
+              </Text>
+              <Text
+                style={{ fontSize: 10, color: theme.textMuted, marginTop: 1 }}
+              >
+                {itens.length === 0
+                  ? "Sem itens"
+                  : `${coletados.length} de ${itens.length} ${itens.length === 1 ? "item" : "itens"} coletados`}
+              </Text>
+            </View>
           </View>
-        ) : null}
-      </View>
 
-      {/* Conteúdo: empty state ou lista */}
-      {itens.length === 0 ? (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingHorizontal: 20,
-          }}
-        >
-          <Text
+          {itens.length > 0 ? (
+            <View
+              style={{
+                height: 6,
+                backgroundColor: "rgba(162, 3, 255, 0.12)",
+                borderRadius: 3,
+                overflow: "hidden",
+              }}
+            >
+              <View
+                style={{
+                  width: progressoPct,
+                  height: "100%",
+                  backgroundColor:
+                    progresso === 1
+                      ? "rgba(80, 220, 100, 0.85)"
+                      : theme.accent,
+                  borderRadius: 3,
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+
+        {/* Empty state */}
+        {itens.length === 0 ? (
+          <View
             style={{
-              fontSize: 14,
-              color: theme.textMuted,
-              textAlign: "center",
-              lineHeight: 20,
+              paddingTop: 60,
+              paddingHorizontal: 20,
+              alignItems: "center",
             }}
           >
-            Esta lista está vazia.{"\n"}Toque em &quot;Adicionar item&quot;
-            para começar.
-          </Text>
-        </View>
-      ) : (
-        <SwipeListView
-          data={sortedItems}
-          keyExtractor={(it) => it.id.toString()}
-          contentContainerStyle={{
-            paddingHorizontal: 14,
-            paddingBottom: 90,
-          }}
-          ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item, index }) => {
-            const isFirstPending = !item.coletado && index === 0;
-            const isFirstCollected =
-              item.coletado &&
-              (index === 0 || !sortedItems[index - 1].coletado);
+            <Text
+              style={{
+                fontSize: 14,
+                color: theme.textMuted,
+                textAlign: "center",
+                lineHeight: 20,
+              }}
+            >
+              Esta lista está vazia.{"\n"}Toque em &quot;Adicionar
+              item&quot; para começar.
+            </Text>
+          </View>
+        ) : null}
 
-            return (
-              <View>
-                {isFirstPending ? (
-                  <SectionLabel>
-                    Pendentes ({pendentes.length})
-                  </SectionLabel>
-                ) : null}
-                {isFirstCollected ? (
-                  <SectionLabel>
-                    Coletados ({coletados.length})
-                  </SectionLabel>
-                ) : null}
+        {/* Seção PENDENTES — só aparece se houver pendentes */}
+        {pendentes.length > 0 ? (
+          <>
+            <Text style={sectionLabelStyle(theme)}>
+              Pendentes ({pendentes.length})
+            </Text>
+            <SwipeListView
+              data={pendentes}
+              keyExtractor={(it) => `pending-${it.id}`}
+              contentContainerStyle={{ paddingHorizontal: 14 }}
+              ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
                 <ListItemRow
                   item={item}
                   onToggle={() => handleToggle(item.id)}
                 />
-              </View>
-            );
-          }}
-          renderHiddenItem={({ item, index }) => {
-            // Empurra o background pra baixo na altura do section label
-            // pra ele não cobrir o texto "Pendentes"/"Coletados".
-            const isFirstPending = !item.coletado && index === 0;
-            const isFirstCollected =
-              item.coletado &&
-              (index === 0 || !sortedItems[index - 1].coletado);
-            const hasLabel = isFirstPending || isFirstCollected;
+              )}
+              renderHiddenItem={({ item }) => (
+                <SwipeDeleteBg
+                  produtoNome={item.produto_nome}
+                  onPress={() => handleDeleteItem(item.id)}
+                />
+              )}
+              rightOpenValue={-80}
+              disableRightSwipe
+              closeOnRowOpen
+              closeOnRowPress
+              tension={40}
+              friction={8}
+            />
+          </>
+        ) : null}
 
-            return (
-              <View
-                style={{
-                  flex: 1,
-                  paddingTop: hasLabel ? 28 : 0,
-                }}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#1a0010",
-                    borderRadius: 12,
-                    flexDirection: "row",
-                    justifyContent: "flex-end",
-                    alignItems: "center",
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={() => handleDeleteItem(item.id)}
-                    accessibilityLabel={`Remover ${item.produto_nome}`}
-                    style={{
-                      width: 80,
-                      height: "100%",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    <Ionicons
-                      name="trash-outline"
-                      size={18}
-                      color="#ff6b9d"
-                    />
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: "500",
-                        color: "#ff6b9d",
-                      }}
-                    >
-                      Remover
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          }}
-          rightOpenValue={-80}
-          disableRightSwipe
-          closeOnRowOpen
-          closeOnRowPress
-          tension={40}
-          friction={8}
-        />
-      )}
+        {/* Seção COLETADOS — só aparece se houver coletados */}
+        {coletados.length > 0 ? (
+          <>
+            <Text style={sectionLabelStyle(theme, /*topGap*/ true)}>
+              Coletados ({coletados.length})
+            </Text>
+            <SwipeListView
+              data={coletados}
+              keyExtractor={(it) => `done-${it.id}`}
+              contentContainerStyle={{ paddingHorizontal: 14 }}
+              ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <ListItemRow
+                  item={item}
+                  onToggle={() => handleToggle(item.id)}
+                />
+              )}
+              renderHiddenItem={({ item }) => (
+                <SwipeDeleteBg
+                  produtoNome={item.produto_nome}
+                  onPress={() => handleDeleteItem(item.id)}
+                />
+              )}
+              rightOpenValue={-80}
+              disableRightSwipe
+              closeOnRowOpen
+              closeOnRowPress
+              tension={40}
+              friction={8}
+            />
+          </>
+        ) : null}
+      </ScrollView>
 
       <ActionBar
         buttons={[
@@ -330,21 +306,57 @@ export default function ListDetailScreen() {
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  const { theme } = useTheme();
+/** Estilo do label de seção. `topGap` adiciona espaço extra antes da seção "Coletados". */
+function sectionLabelStyle(
+  theme: ReturnType<typeof useTheme>["theme"],
+  topGap = false
+) {
+  return {
+    fontSize: 9,
+    color: theme.textMuted,
+    textTransform: "uppercase" as const,
+    letterSpacing: 1.1,
+    paddingHorizontal: 18,
+    paddingTop: topGap ? 14 : 10,
+    paddingBottom: 6,
+  };
+}
+
+/** Background rosa-crimson com botão Remover — usado no renderHiddenItem das duas listas. */
+function SwipeDeleteBg({
+  produtoNome,
+  onPress,
+}: {
+  produtoNome: string;
+  onPress: () => void;
+}) {
   return (
-    <Text
+    <View
       style={{
-        fontSize: 9,
-        color: theme.textMuted,
-        textTransform: "uppercase",
-        letterSpacing: 1.1,
-        paddingHorizontal: 4,
-        paddingTop: 10,
-        paddingBottom: 6,
+        flex: 1,
+        backgroundColor: "#1a0010",
+        borderRadius: 12,
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        alignItems: "center",
       }}
     >
-      {children}
-    </Text>
+      <TouchableOpacity
+        onPress={onPress}
+        accessibilityLabel={`Remover ${produtoNome}`}
+        style={{
+          width: 80,
+          height: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        <Ionicons name="trash-outline" size={18} color="#ff6b9d" />
+        <Text style={{ fontSize: 10, fontWeight: "500", color: "#ff6b9d" }}>
+          Remover
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
