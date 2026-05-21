@@ -1,14 +1,13 @@
 /**
  * Modal de seleção de mercado.
  *
- * - Lista os mercados cadastrados (toque seleciona e fecha o modal)
- * - Formulário inline para criar um novo mercado
+ * - Lista os mercados cadastrados como `ListRow` (toque seleciona e fecha)
+ * - Formulário inline no rodapé para criar um novo mercado
  *
  * Selecionar um mercado faz duas coisas (via CartContext.selectMarket):
  *   1. Retoma sessão ativa naquele mercado se existir
  *   2. Caso contrário, cria nova sessão ativa
  */
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -22,6 +21,7 @@ import {
 } from "react-native";
 
 import { Button } from "@/components/ui/Button";
+import { ListRow } from "@/components/ui/ListRow";
 import { palette } from "@/constants/Colors";
 import { createMarket, getAllMarkets } from "@/database/queries/markets";
 import { useCart } from "@/hooks/useCart";
@@ -88,26 +88,25 @@ export default function MarketSelectModal() {
         data={mercados}
         keyExtractor={(m) => String(m.id)}
         renderItem={({ item }) => (
-          <Pressable
+          <ListRow
+            leftCustom={
+              <View
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  backgroundColor: item.cor,
+                  flexShrink: 0,
+                }}
+              />
+            }
+            title={item.nome}
+            subtitle={item.endereco}
+            showArrow
             onPress={() => handleSelect(item.id)}
-            style={({ pressed }) => [
-              styles.row,
-              {
-                backgroundColor: theme.card,
-                borderColor: theme.border,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <View
-              style={[styles.colorDot, { backgroundColor: item.cor }]}
-            />
-            <Text style={[styles.name, { color: theme.text }]}>
-              {item.nome}
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.textHint} />
-          </Pressable>
+          />
         )}
+        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         ListHeaderComponent={
           loading ? (
             <View style={styles.loading}>
@@ -205,18 +204,7 @@ export default function MarketSelectModal() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  listContent: { padding: 16, gap: 8 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  colorDot: { width: 12, height: 12, borderRadius: 6 },
-  name: { flex: 1, fontSize: 15, fontWeight: "600" },
+  listContent: { padding: 14 },
   loading: { padding: 16, alignItems: "center" },
   empty: { padding: 24, textAlign: "center", fontSize: 13 },
   footer: { padding: 12, borderTopWidth: 1 },

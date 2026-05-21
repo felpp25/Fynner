@@ -1,166 +1,127 @@
 /**
- * CartItem — card frontal de um item do carrinho (Stage 3, UI fix).
+ * CartItem — card frontal de um item do carrinho (Stage 3, refatorado).
  *
- * Layout aprovado em review:
- *  ┌──────────────────────────────────────────────────────┐
- *  │ [ícone 34x34]  Nome do produto      R$ subtotal      │
- *  │                R$ X,XX × qtd        [−] qtd [+]      │
- *  └──────────────────────────────────────────────────────┘
+ * Layout:
+ *   [IconBox] [nome + preço×qtd (flex:1, minWidth:0)] [subtotal + controles (flexShrink:0)]
  *
- * Importante:
- *  - O ícone à esquerda tem flexShrink:0 para nunca colapsar.
- *  - O bloco de info no meio usa flex:1 + minWidth:0 para garantir que
- *    o numberOfLines={1} respeite o espaço disponível e não estoure.
- *  - O bloco direito tem flexShrink:0 para preservar tamanho do total
- *    e dos botões +/−.
- *  - Os botões +/− são Pressables filhos do Pressable do card — o RN
- *    absorve o evento no filho, então tocar em +/− não dispara o tap
- *    do card (que abre o modal de detalhes).
+ * Construído sobre `IconBox` do design system. Sem ação de navegação no card —
+ * o tap no card é gerenciado pelo wrapper externo (SwipeListView).
  */
-import { Ionicons } from "@expo/vector-icons";
-import { Link } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 
+import { IconBox } from "@/components/ui/IconBox";
+import { useTheme } from "@/hooks/useTheme";
 import type { ItemComProduto } from "@/types";
-import { formatBRL } from "@/utils/currency";
 import { getCategoryIcon } from "@/utils/categoryIcons";
+import { formatBRL } from "@/utils/currency";
 
 interface CartItemProps {
   item: ItemComProduto;
-  onIncrease: () => void;
-  onDecrease: () => void;
+  onIncrement: (item: ItemComProduto) => void;
+  onDecrement: (item: ItemComProduto) => void;
 }
 
-export function CartItem({ item, onIncrease, onDecrease }: CartItemProps) {
+export function CartItem({ item, onIncrement, onDecrement }: CartItemProps) {
+  const { theme } = useTheme();
+
   return (
-    <Link
-      href={{
-        pathname: "/modals/item-detail",
-        params: { produtoId: String(item.produto_id) },
+    <View
+      style={{
+        backgroundColor: theme.card,
+        borderWidth: 0.5,
+        borderColor: theme.accentBorder,
+        borderRadius: 14,
+        padding: 11,
+        paddingHorizontal: 13,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 11,
+        minHeight: 62,
       }}
-      asChild
     >
-      <Pressable
-        style={({ pressed }) => [
-          styles.cardFront,
-          { opacity: pressed ? 0.9 : 1 },
-        ]}
+      <IconBox icon={getCategoryIcon(item.produto_categoria)} size="md" />
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: 13,
+            fontWeight: "500",
+            color: theme.text,
+            marginBottom: 2,
+          }}
+        >
+          {item.produto_nome}
+        </Text>
+        <Text style={{ fontSize: 11, color: theme.textMuted }}>
+          {formatBRL(item.preco)} × {item.quantidade}
+        </Text>
+      </View>
+
+      <View
+        style={{
+          flexShrink: 0,
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 5,
+        }}
       >
-        <View style={styles.catIcon}>
-          <Ionicons
-            name={getCategoryIcon(item.produto_categoria)}
-            size={17}
-            color="#d6a5fa"
-          />
-        </View>
-
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemName} numberOfLines={1}>
-            {item.produto_nome}
+        <Text
+          style={{
+            fontSize: 13,
+            fontWeight: "600",
+            color: theme.accentLight,
+          }}
+        >
+          {formatBRL(item.subtotal)}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <TouchableOpacity
+            onPress={() => onDecrement(item)}
+            hitSlop={6}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: theme.accentMid,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+            accessibilityLabel="Diminuir quantidade"
+          >
+            <Text style={{ color: theme.text, fontSize: 13, lineHeight: 15 }}>
+              −
+            </Text>
+          </TouchableOpacity>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.text,
+              minWidth: 14,
+              textAlign: "center",
+            }}
+          >
+            {item.quantidade}
           </Text>
-          <Text style={styles.itemSub}>
-            {formatBRL(item.preco)} × {item.quantidade}
-          </Text>
+          <TouchableOpacity
+            onPress={() => onIncrement(item)}
+            hitSlop={6}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: theme.accent,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+            accessibilityLabel="Aumentar quantidade"
+          >
+            <Text style={{ color: "#fff", fontSize: 13, lineHeight: 15 }}>
+              +
+            </Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.itemRight}>
-          <Text style={styles.itemTotal}>{formatBRL(item.subtotal)}</Text>
-          <View style={styles.qtyCtrl}>
-            <Pressable
-              hitSlop={6}
-              onPress={onDecrease}
-              style={[styles.qBtn, styles.qBtnMuted]}
-            >
-              <Text style={styles.qBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.qtyText}>{item.quantidade}</Text>
-            <Pressable
-              hitSlop={6}
-              onPress={onIncrease}
-              style={[styles.qBtn, styles.qBtnAccent]}
-            >
-              <Text style={styles.qBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Pressable>
-    </Link>
+      </View>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  cardFront: {
-    backgroundColor: "#1a0229",
-    borderWidth: 0.5,
-    borderColor: "rgba(162, 3, 255, 0.22)",
-    borderRadius: 14,
-    padding: 11,
-    paddingHorizontal: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  catIcon: {
-    width: 34,
-    height: 34,
-    backgroundColor: "rgba(162, 3, 255, 0.22)",
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  itemInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  itemName: {
-    fontSize: 12,
-    color: "#ffffff",
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  itemSub: {
-    fontSize: 10,
-    color: "rgba(214, 165, 250, 0.55)",
-  },
-  itemRight: {
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: 4,
-    flexShrink: 0,
-  },
-  itemTotal: {
-    fontSize: 12,
-    color: "#d6a5fa",
-    fontWeight: "600",
-  },
-  qtyCtrl: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  qBtn: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qBtnAccent: {
-    backgroundColor: "#a203ff",
-  },
-  qBtnMuted: {
-    backgroundColor: "rgba(162, 3, 255, 0.22)",
-  },
-  qBtnText: {
-    fontSize: 12,
-    color: "#ffffff",
-    lineHeight: 14,
-  },
-  qtyText: {
-    fontSize: 11,
-    color: "#ffffff",
-    minWidth: 12,
-    textAlign: "center",
-  },
-});

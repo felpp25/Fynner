@@ -6,7 +6,7 @@
  *   [MarketHeader]          → mercado ativo + data + trocar
  *   [TotalBanner]           → total + orçamento (toca para editar)
  *   [SwipeListView itens]   → cada item com +/− e swipe-esquerda pra deletar
- *   [Footer fixo]           → Escanear · Inserir manualmente · Finalizar
+ *   [Footer fixo]           → Escanear · Adicionar · Finalizar (variant=danger)
  *
  * Comportamento:
  * - Se não há sessão ativa, mostra EmptyState com CTA "Selecionar mercado".
@@ -31,6 +31,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useCart } from "@/hooks/useCart";
 import { useTheme } from "@/hooks/useTheme";
+import type { ItemComProduto } from "@/types";
 import { formatBRL } from "@/utils/currency";
 
 const SWIPE_BTN_WIDTH = 80;
@@ -50,7 +51,7 @@ export default function CarrinhoScreen() {
   } = useCart();
   const [budgetOpen, setBudgetOpen] = useState(false);
 
-  function handleAdjustQty(itemId: number, currentQty: number, delta: number) {
+  function adjustQty(itemId: number, currentQty: number, delta: number) {
     const next = currentQty + delta;
     // Decrementar de 1 para 0 = remover (com confirmação leve via Alert).
     if (next <= 0) {
@@ -69,6 +70,14 @@ export default function CarrinhoScreen() {
       return;
     }
     updateQuantity(itemId, next);
+  }
+
+  function handleIncrement(item: ItemComProduto) {
+    adjustQty(item.id, item.quantidade, +1);
+  }
+
+  function handleDecrement(item: ItemComProduto) {
+    adjustQty(item.id, item.quantidade, -1);
   }
 
   function handleFinalize() {
@@ -144,12 +153,8 @@ export default function CarrinhoScreen() {
             <View style={styles.itemWrap}>
               <CartItem
                 item={item}
-                onIncrease={() =>
-                  handleAdjustQty(item.id, item.quantidade, +1)
-                }
-                onDecrease={() =>
-                  handleAdjustQty(item.id, item.quantidade, -1)
-                }
+                onIncrement={handleIncrement}
+                onDecrement={handleDecrement}
               />
             </View>
           )}
@@ -160,6 +165,7 @@ export default function CarrinhoScreen() {
                   style={styles.deleteAction}
                   onPress={() => removeItem(item.id)}
                   activeOpacity={0.7}
+                  accessibilityLabel={`Remover ${item.produto_nome}`}
                 >
                   <Ionicons name="trash-outline" size={20} color="#ff6b9d" />
                   <Text style={styles.deleteText}>Remover</Text>
@@ -170,6 +176,7 @@ export default function CarrinhoScreen() {
           rightOpenValue={-SWIPE_BTN_WIDTH}
           disableRightSwipe
           closeOnRowOpen
+          closeOnRowPress
           tension={40}
           friction={8}
           contentContainerStyle={styles.listContent}
@@ -226,8 +233,8 @@ const styles = StyleSheet.create({
   headerArea: { paddingHorizontal: 16, paddingTop: 8 },
   stack: { gap: 12, marginTop: 8 },
 
-  // Front e Hidden compartilham o mesmo paddingHorizontal para que
-  // o fundo rosa fique perfeitamente alinhado com o card roxo.
+  // Front e Hidden compartilham o mesmo paddingHorizontal e marginBottom
+  // para que o fundo rosa fique perfeitamente alinhado com o card roxo.
   itemWrap: { paddingHorizontal: 16, marginBottom: 8 },
   hiddenWrap: { paddingHorizontal: 16, marginBottom: 8, flex: 1 },
   hiddenRow: {
