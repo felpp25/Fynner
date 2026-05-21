@@ -25,6 +25,17 @@ const migrations: Migration[] = [
       await db.execAsync(SCHEMA_SQL);
     },
   },
+  {
+    // Soft-delete de mercados: mercados removidos da lista mas com histórico
+    // preservado ficam com ativo=0. DEFAULT 1 garante que todos os mercados
+    // pré-existentes continuem ativos sem migração de dados.
+    id: "002_add_market_soft_delete",
+    up: async (db) => {
+      await db.execAsync(
+        "ALTER TABLE mercados ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1;"
+      );
+    },
+  },
 ];
 
 /**

@@ -11,6 +11,11 @@ export interface Mercado {
   nome: string;
   endereco?: string;
   cor: string;
+  /**
+   * 1 = mercado aparece na lista. 0 = soft-deletado (sumiu da lista mas
+   * histórico de compras foi preservado). Migration 002.
+   */
+  ativo: number;
   created_at: string;
   /**
    * Data ISO (YYYY-MM-DD) da última compra finalizada neste mercado.

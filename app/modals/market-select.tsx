@@ -22,10 +22,16 @@ import {
   View,
 } from "react-native";
 
+import { DeleteMarketSheet } from "@/components/market/DeleteMarketSheet";
 import { ActionBar, type ActionBarButton } from "@/components/ui/ActionBar";
 import { ListRow } from "@/components/ui/ListRow";
 import { palette } from "@/constants/Colors";
-import { createMarket, getAllMarkets } from "@/database/queries/markets";
+import {
+  createMarket,
+  getAllMarkets,
+  hardDeleteMarket,
+  softDeleteMarket,
+} from "@/database/queries/markets";
 import { useCart } from "@/hooks/useCart";
 import { useTheme } from "@/hooks/useTheme";
 import type { Mercado } from "@/types";
@@ -53,7 +59,7 @@ function formatLastVisit(iso: string): string {
 
 export default function MarketSelectModal() {
   const { theme } = useTheme();
-  const { selectMarket } = useCart();
+  const { selectMarket, reload: reloadCart } = useCart();
   const [mercados, setMercados] = useState<Mercado[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -61,33 +67,54 @@ export default function MarketSelectModal() {
   const [novoNome, setNovoNome] = useState("");
   const [corSelecionada, setCorSelecionada] = useState(MARKET_COLORS[0]);
 
-  // Estado da confirmação de delete — a sheet em si vem na Etapa 2.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [marketToDelete, setMarketToDelete] = useState<Mercado | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showDeleteSheet, setShowDeleteSheet] = useState(false);
+
+  async function loadMarkets() {
+    try {
+      const all = await getAllMarkets();
+      setMercados(all);
+    } catch (err) {
+      console.error("[market-select] falha ao listar:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMarkets();
+  }, []);
+
+  async function handleSelect(mercadoId: number) {
+    await selectMarket(mercadoId);
+    router.back();
+  }
 
   function handleDeletePress(mercado: Mercado) {
     setMarketToDelete(mercado);
     setShowDeleteSheet(true);
   }
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const all = await getAllMarkets();
-        setMercados(all);
-      } catch (err) {
-        console.error("[market-select] falha ao listar:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  function handleDeleteClose() {
+    setShowDeleteSheet(false);
+    setMarketToDelete(null);
+  }
 
-  async function handleSelect(mercadoId: number) {
-    await selectMarket(mercadoId);
-    router.back();
+  async function handleKeepHistory(mercadoId: number) {
+    await softDeleteMarket(mercadoId);
+    await loadMarkets();
+    // O carrinho pode estar referenciando este mercado; sincroniza pra que o
+    // header do carrinho reflita a remoção (sessão ativa permanece, só sai
+    // da lista de seleção).
+    await reloadCart();
+  }
+
+  async function handleDeleteAll(mercadoId: number) {
+    await hardDeleteMarket(mercadoId);
+    await loadMarkets();
+    // Hard delete apaga compras inclusive a sessão ativa — o carrinho
+    // precisa recarregar para detectar que não há mais sessão.
+    await reloadCart();
   }
 
   async function handleCreate() {
@@ -233,6 +260,14 @@ export default function MarketSelectModal() {
       ) : null}
 
       <ActionBar buttons={actionButtons} />
+
+      <DeleteMarketSheet
+        mercado={marketToDelete}
+        visible={showDeleteSheet}
+        onClose={handleDeleteClose}
+        onKeepHistory={handleKeepHistory}
+        onDeleteAll={handleDeleteAll}
+      />
     </View>
   );
 }

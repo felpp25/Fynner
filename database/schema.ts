@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS mercados (
   endereco    TEXT,
   cor         TEXT    DEFAULT '#a203ff',
   created_at  TEXT    DEFAULT (datetime('now'))
+  -- NOTA: a coluna ativo INTEGER NOT NULL DEFAULT 1 é adicionada pela
+  -- migration 002_add_market_soft_delete. Mantida fora deste CREATE TABLE
+  -- pra evitar conflito com o ALTER em devices que migram da v1.
 );
 
 CREATE TABLE IF NOT EXISTS compras (

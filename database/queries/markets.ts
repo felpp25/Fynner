@@ -8,10 +8,13 @@ import { getDb } from "../db";
 import type { Mercado, MarketComparison } from "@/types";
 
 /**
- * Lista todos os mercados cadastrados, mais recentes primeiro.
- * Inclui `ultima_visita` (data da última compra finalizada) via LEFT JOIN —
+ * Lista mercados ATIVOS (não soft-deletados), mais recentes primeiro.
+ * Inclui `ultima_visita` (data da última compra finalizada) via subquery —
  * vem como string vazia quando o mercado nunca teve compra; convertemos
  * para `undefined` para o consumidor lidar de forma idiomática em TS.
+ *
+ * Mercados com `ativo=0` ficam fora desta lista mas continuam aparecendo
+ * em `getMarketComparison` (que serve o histórico).
  */
 export async function getAllMarkets(): Promise<Mercado[]> {
   const db = await getDb();
@@ -24,12 +27,42 @@ export async function getAllMarkets(): Promise<Mercado[]> {
         ''
       ) AS ultima_visita
     FROM mercados m
+    WHERE m.ativo = 1
     ORDER BY m.created_at DESC
   `);
   return rows.map((r) => ({
     ...r,
     ultima_visita: r.ultima_visita || undefined,
   }));
+}
+
+/**
+ * Soft delete — esconde o mercado da lista ativa mas preserva todos os
+ * dados (compras, itens, comparativos de preço). Use quando o usuário não
+ * frequenta mais o mercado mas quer manter consultas históricas.
+ */
+export async function softDeleteMarket(mercadoId: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    "UPDATE mercados SET ativo = 0 WHERE id = ?",
+    mercadoId
+  );
+}
+
+/**
+ * Hard delete — apaga o mercado, suas compras e itens. Ação irreversível.
+ *
+ * Ordem importa: `itens_compra → compras` tem ON DELETE CASCADE, então
+ * ao deletar as compras, os itens vão junto. Como `compras → mercados`
+ * NÃO tem cascade (intencional, pra evitar acidente), apagamos compras
+ * explicitamente antes do mercado, dentro de uma transação.
+ */
+export async function hardDeleteMarket(mercadoId: number): Promise<void> {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM compras WHERE mercado_id = ?", mercadoId);
+    await db.runAsync("DELETE FROM mercados WHERE id = ?", mercadoId);
+  });
 }
 
 /** Busca um mercado por id. Retorna null se não existir. */
