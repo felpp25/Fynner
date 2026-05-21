@@ -141,6 +141,16 @@ function ThemedStack() {
             presentation: "modal",
           }}
         />
+        <Stack.Screen
+          name="modals/session-detail"
+          options={{
+            // Card (push lateral) ao invés de modal — combina mais com
+            // drill-down a partir do histórico, e o header nativo já dá
+            // botão "voltar".
+            title: "Detalhe da compra",
+            presentation: "card",
+          }}
+        />
       </Stack>
     </View>
   );

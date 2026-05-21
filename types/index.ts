@@ -77,11 +77,15 @@ export interface HistoricoPreco {
   preco: number;
 }
 
+/** Períodos pré-definidos para filtros e comparativos. */
+export type FilterPeriodo = "semana" | "mes" | "3meses" | "tudo";
+
 export interface MarketComparison {
   mercado_id: number;
   mercado_nome: string;
   mercado_cor: string;
   ultima_visita: string;
-  ultimo_total: number;
+  /** Gasto médio (AVG) das compras finalizadas dentro do período selecionado. */
+  total_medio: number;
   total_visitas: number;
 }

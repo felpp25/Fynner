@@ -5,7 +5,15 @@
  * entre compras: o usuário escolhe um existente OU cria um novo.
  */
 import { getDb } from "../db";
-import type { Mercado, MarketComparison } from "@/types";
+import type { FilterPeriodo, Mercado, MarketComparison } from "@/types";
+
+/** Converte um período pré-definido em dias para usar em date('now', '-N days'). */
+function periodoToDays(periodo?: FilterPeriodo): number {
+  if (periodo === "semana") return 7;
+  if (periodo === "3meses") return 90;
+  if (periodo === "tudo") return 99999;
+  return 30; // padrão = mês
+}
 
 /**
  * Lista mercados ATIVOS (não soft-deletados), mais recentes primeiro.
@@ -96,24 +104,38 @@ export async function createMarket(
  *
  * Note que LEFT JOIN garante mercados sem compras também aparecerem.
  */
-export async function getMarketComparison(): Promise<MarketComparison[]> {
+/**
+ * Comparativo de mercados restrito a um período opcional.
+ *
+ * - `total_medio` = AVG das compras finalizadas DENTRO do período. Antes era
+ *   "última compra" — agora é média, mais útil pra comparar mercados em si.
+ * - `ultima_visita` continua sendo MAX(c.data) dentro do período.
+ * - Mostra somente mercados ativos (soft delete já filtra na lista de seleção;
+ *   aqui também filtra pra não poluir o comparativo com mercados removidos).
+ * - HAVING total_visitas > 0 esconde mercados sem compras no período (sem
+ *   ele um mercado novo apareceria com R$ 0,00).
+ */
+export async function getMarketComparison(
+  periodo?: FilterPeriodo
+): Promise<MarketComparison[]> {
   const db = await getDb();
-  return db.getAllAsync<MarketComparison>(`
-    SELECT
-      m.id                  AS mercado_id,
-      m.nome                AS mercado_nome,
-      m.cor                 AS mercado_cor,
-      COALESCE(MAX(c.data), '')      AS ultima_visita,
-      COALESCE(
-        (SELECT total FROM compras
-         WHERE mercado_id = m.id AND status = 'finalizada'
-         ORDER BY data DESC, id DESC LIMIT 1),
-        0
-      ) AS ultimo_total,
-      COUNT(c.id)           AS total_visitas
-    FROM mercados m
-    LEFT JOIN compras c ON c.mercado_id = m.id AND c.status = 'finalizada'
-    GROUP BY m.id
-    ORDER BY ultima_visita DESC
-  `);
+  const days = periodoToDays(periodo);
+  return db.getAllAsync<MarketComparison>(
+    `SELECT
+       m.id                            AS mercado_id,
+       m.nome                          AS mercado_nome,
+       m.cor                           AS mercado_cor,
+       COALESCE(MAX(c.data), '')       AS ultima_visita,
+       COALESCE(AVG(c.total), 0)       AS total_medio,
+       COUNT(c.id)                     AS total_visitas
+     FROM mercados m
+     LEFT JOIN compras c ON c.mercado_id = m.id
+       AND c.status = 'finalizada'
+       AND c.data >= date('now', ?)
+     WHERE m.ativo = 1
+     GROUP BY m.id
+     HAVING total_visitas > 0
+     ORDER BY total_medio ASC`,
+    `-${days} days`
+  );
 }
