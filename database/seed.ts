@@ -21,7 +21,7 @@ import { createMarket } from "./queries/markets";
 import { findOrCreateProduct } from "./queries/products";
 import { createSession, finalizeSession } from "./queries/sessions";
 import { addItem, updateSessionTotal } from "./queries/items";
-import { addToList } from "./queries/list";
+import { addItemToList } from "./queries/lists";
 
 const SEED_KEY = "@fynner/seed-applied-v1";
 
@@ -138,16 +138,22 @@ export async function runSeed(): Promise<void> {
     ],
   });
 
-  // 5. Lista de compras pré-configurada (5 itens, todos pendentes)
-  for (const produto of [
-    "Detergente",
-    "Sabão em Pó",
-    "Papel Higiênico",
-    "Banana Prata",
-    "Tomate",
-  ]) {
-    const produtoId = await findOrCreateProduct(produto);
-    await addToList(produtoId, 1);
+  // 5. Itens na lista padrão "Compras" — criada pela migration 003.
+  // Pegamos o id dela em vez de criar uma nova pra evitar duplicar.
+  const db = await getDb();
+  const listaPadrao = await db.getFirstAsync<{ id: number }>(
+    "SELECT id FROM listas WHERE nome = 'Compras' ORDER BY id ASC LIMIT 1"
+  );
+  if (listaPadrao) {
+    for (const produto of [
+      "Detergente",
+      "Sabão em Pó",
+      "Papel Higiênico",
+      "Banana Prata",
+      "Tomate",
+    ]) {
+      await addItemToList(listaPadrao.id, produto, 1);
+    }
   }
 
   await markSeeded();

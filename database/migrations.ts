@@ -36,6 +36,37 @@ const migrations: Migration[] = [
       );
     },
   },
+  {
+    /**
+     * Listas nomeadas: cria tabela `listas` e vincula `lista_itens` a uma
+     * delas via `lista_id`. Devices com itens órfãos do modelo antigo
+     * (lista única) recebem uma lista padrão "Compras" e os itens migram
+     * pra ela. Devices novos terão a lista "Compras" criada vazia — o
+     * seed cuida de popular em DEV.
+     */
+    id: "003_named_lists",
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS listas (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome        TEXT    NOT NULL,
+          icone       TEXT    NOT NULL DEFAULT 'cart-outline',
+          created_at  TEXT    DEFAULT (datetime('now')),
+          updated_at  TEXT    DEFAULT (datetime('now'))
+        );
+
+        ALTER TABLE lista_itens ADD COLUMN lista_id INTEGER REFERENCES listas(id) ON DELETE CASCADE;
+
+        CREATE INDEX IF NOT EXISTS idx_lista_itens_lista_id ON lista_itens(lista_id);
+
+        INSERT INTO listas (nome, icone) VALUES ('Compras', 'cart-outline');
+
+        UPDATE lista_itens
+        SET lista_id = (SELECT id FROM listas WHERE nome = 'Compras' LIMIT 1)
+        WHERE lista_id IS NULL;
+      `);
+    },
+  },
 ];
 
 /**

@@ -151,6 +151,13 @@ function ThemedStack() {
             presentation: "card",
           }}
         />
+        <Stack.Screen
+          name="modals/list-detail"
+          options={{
+            title: "Lista",
+            presentation: "card",
+          }}
+        />
       </Stack>
     </View>
   );

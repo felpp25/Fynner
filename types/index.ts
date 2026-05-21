@@ -62,13 +62,36 @@ export interface ItemComProduto extends ItemCompra {
   produto_categoria: string;
 }
 
+/**
+ * Lista de compras nomeada (ex: "Compras semanais", "Churrasco do sábado").
+ * Cada lista contém múltiplos `ListaItem` vinculados via `lista_id`.
+ */
+export interface Lista {
+  id: number;
+  nome: string;
+  /** Nome de um ícone Ionicons (ex: 'cart-outline'). */
+  icone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListaComProgresso extends Lista {
+  total_itens: number;
+  itens_coletados: number;
+}
+
 export interface ListaItem {
   id: number;
+  lista_id: number;
   produto_id: number;
   quantidade_desejada: number;
   coletado: boolean;
   ordem: number;
+}
+
+export interface ListaItemComProduto extends ListaItem {
   produto_nome: string;
+  produto_categoria: string;
 }
 
 export interface HistoricoPreco {
