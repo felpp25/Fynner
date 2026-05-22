@@ -39,7 +39,7 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | 4 — Histórico          | ✅ pronto   | `SessionCard`, `InsightCard`, `MarketComparison`, `FilterSheet`, `SessionItemRow`, tela `history.tsx` + `modals/session-detail.tsx`  |
 | 5 — Listas             | ✅ pronto   | Migration 003 (`listas` + `lista_itens.lista_id`); `ListCard`, `ListItemRow`, `NewListSheet`, `AddItemSheet`; tela `list.tsx` + `modals/list-detail.tsx` |
 | 6 — Scanner OCR        | 🟡 parcial  | UI completa em Expo Go (câmera + viewfinder + captura + form). `services/ocr.ts` está stub; OCR real requer dev build + ML Kit nativo |
-| 7 — Export/import CSV  | ⏳ pendente | Backup do histórico                                                                                                                  |
+| 7 — Export/import CSV  | ✅ pronto   | `services/csv.ts` com parser RFC 4180; botões em Configurações; preview/result modal; dedup por (data+mercado+produto+preço)            |
 | 8 — UI da IA           | ⏳ pendente | Chat com respostas locais (banco)                                                                                                    |
 | 9 — Integração IA real | ⏳ pendente | API definida quando o user escolher modelo                                                                                           |
 | 10 — Polish            | ⏳ pendente | Onboarding, edge cases, animações                                                                                                    |
@@ -246,13 +246,16 @@ git push                    # ao sair
 - O stub `services/ocr.ts` já tem `extractName` e `extractPrice` prontos;
   basta preencher `recognizeText(uri)` com a chamada do ML Kit.
 
-**Stage 7 — Export/import CSV**:
-- `services/csv.ts` com `exportToCSV()` e `importFromCSV(uri)`.
-- Botões em `app/settings.tsx` integrando com `expo-file-system`,
-  `expo-sharing`, `expo-document-picker` (todos já instalados).
-- Formato: `data,mercado,produto,categoria,preco,quantidade,subtotal`.
+**Stage 8 — UI da IA**:
+- Tela `app/(tabs)/ai.tsx` com chat: bubbles do usuário (accent) e da IA
+  (card), chips de sugestões frequentes ("Meu gasto este mês", "Mercado
+  mais barato"), botão de mic com overlay de gravação animado.
+- `services/ai.ts` com função `query(pergunta)` que responde via consulta
+  ao banco SQLite (não LLM ainda). Estrutura preparada para receber
+  a chamada à API no Stage 9.
+- `hooks/useVoice.ts` envolvendo `@react-native-voice/voice` (a instalar).
 
-**Stages 8–10** — UI da IA, integração real, polish (ver Seção 2).
+**Stages 9–10** — Integração IA real e polish (ver Seção 2).
 
 ---
 

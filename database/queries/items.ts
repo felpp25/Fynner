@@ -96,6 +96,40 @@ export async function getItemsBySession(
 }
 
 /**
+ * Linha achatada para export CSV: cada item com data da compra, nome do
+ * mercado, nome e categoria do produto, preço, quantidade e subtotal.
+ * Inclui sessões 'ativa' e 'finalizada' — o backup pega tudo.
+ */
+export interface ExportRow {
+  data: string;
+  mercado: string;
+  produto: string;
+  categoria: string;
+  preco: number;
+  quantidade: number;
+  subtotal: number;
+}
+
+export async function getAllItemsForExport(): Promise<ExportRow[]> {
+  const db = await getDb();
+  return db.getAllAsync<ExportRow>(
+    `SELECT
+       c.data       AS data,
+       m.nome       AS mercado,
+       p.nome       AS produto,
+       p.categoria  AS categoria,
+       i.preco      AS preco,
+       i.quantidade AS quantidade,
+       i.subtotal   AS subtotal
+     FROM itens_compra i
+     JOIN compras  c ON c.id = i.compra_id
+     JOIN mercados m ON m.id = c.mercado_id
+     JOIN produtos p ON p.id = i.produto_id
+     ORDER BY c.data ASC, c.id ASC, i.id ASC`
+  );
+}
+
+/**
  * Recalcula o total da sessão somando os subtotais dos itens e grava em
  * `compras.total`. Deve ser chamado após qualquer mudança nos itens.
  */
