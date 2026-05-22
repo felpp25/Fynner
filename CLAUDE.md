@@ -27,19 +27,18 @@ Features principais:
 
 ## 2. Status atual
 
-**Branch `dev` (trabalho do dia a dia)** — último commit `6113f46` (ActionBar
-e padronização dos botões de rodapé, 2026-05-21).
-**Branch `main`** — `dd1e5d0` (Stage 1 estável; só recebe merge testado).
+**Branch `dev` (trabalho do dia a dia)** — Stages 1–5 + UI do Stage 6 estão
+mergeados. **Branch `main`** sincronizada com `dev`.
 
 | Stage                  | Status      | Conteúdo                                                                                                                             |
 | ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 1 — Setup + tema       | ✅ pronto   | Expo SDK 54, NativeWind v4, dark/light com AsyncStorage, 5 skeletons                                                                 |
-| 2 — SQLite             | ✅ pronto   | Schema, migrations, queries CRUD, seed em DEV, useDatabase hook                                                                      |
+| 2 — SQLite             | ✅ pronto   | Schema, migrations (001, 002, 003), queries CRUD, seed em DEV, useDatabase hook                                                      |
 | 3 — Carrinho           | ✅ pronto   | CartContext real, MarketHeader, TotalBanner, CartItem com swipe-delete, 3 modais (market-select, add-item, item-detail), BudgetModal |
 | 3.5 — Design system    | ✅ pronto   | `IconBox`, `Card`, `SectionHeader`, `ListRow`, `ActionBar` + telas Carrinho/Mercado/Configurações refatoradas para usarem            |
-| 4 — Histórico          | ⏳ pendente | Compras passadas, comparativo de mercados, filtros                                                                                   |
-| 5 — Lista de compras   | ⏳ pendente | Lista reutilizável com checkboxes                                                                                                    |
-| 6 — Scanner OCR        | ⏳ pendente | Câmera + ML Kit para ler etiquetas                                                                                                   |
+| 4 — Histórico          | ✅ pronto   | `SessionCard`, `InsightCard`, `MarketComparison`, `FilterSheet`, `SessionItemRow`, tela `history.tsx` + `modals/session-detail.tsx`  |
+| 5 — Listas             | ✅ pronto   | Migration 003 (`listas` + `lista_itens.lista_id`); `ListCard`, `ListItemRow`, `NewListSheet`, `AddItemSheet`; tela `list.tsx` + `modals/list-detail.tsx` |
+| 6 — Scanner OCR        | 🟡 parcial  | UI completa em Expo Go (câmera + viewfinder + captura + form). `services/ocr.ts` está stub; OCR real requer dev build + ML Kit nativo |
 | 7 — Export/import CSV  | ⏳ pendente | Backup do histórico                                                                                                                  |
 | 8 — UI da IA           | ⏳ pendente | Chat com respostas locais (banco)                                                                                                    |
 | 9 — Integração IA real | ⏳ pendente | API definida quando o user escolher modelo                                                                                           |
@@ -66,7 +65,7 @@ e padronização dos botões de rodapé, 2026-05-21).
 | Estado           | React Context + useReducer                            | sem Redux                                                         |
 | Storage prefs    | @react-native-async-storage/async-storage `2.2.0`     | versão é fixada pelo SDK 54 — `npx expo install` quando atualizar |
 | Tipagem          | TypeScript strict                                     | sem `any` explícito                                               |
-| Câmera (Stage 6) | expo-camera + `@react-native-ml-kit/text-recognition` | já instalado                                                      |
+| Câmera (Stage 6) | expo-camera (instalado, com plugin no app.json)       | `@react-native-ml-kit/text-recognition` ainda **não** instalado — requer prebuild + dev client; OCR é stub em `services/ocr.ts` até decidir migrar |
 | Voz (Stage 8)    | `@react-native-voice/voice`                           | a instalar                                                        |
 | Swipe-delete     | `react-native-swipe-list-view`                        | já instalado                                                      |
 
@@ -236,23 +235,24 @@ git push                    # ao sair
 
 ---
 
-## 8. Próximo stage: 4 — Histórico
+## 8. Próximos passos
 
-Quando o user disser pra prosseguir, implementar:
+**Stage 6 (OCR real)** — pendente de decisão:
+- Hoje a tela Scan funciona em Expo Go mas pede para o usuário digitar
+  nome/preço manualmente após a foto.
+- Para o OCR automático, é necessário instalar `@react-native-ml-kit/text-recognition`
+  (ou alternativa nativa), rodar `npx expo prebuild`, e migrar pra dev client
+  (não roda mais em Expo Go).
+- O stub `services/ocr.ts` já tem `extractName` e `extractPrice` prontos;
+  basta preencher `recognizeText(uri)` com a chamada do ML Kit.
 
-- `app/(tabs)/history.tsx` com:
-  - Card de resumo do mês (total + comparação com mês anterior) — usar `Card`
-  - Comparativo de mercados (`getMarketComparison`) com badge no mais barato do mês
-  - Lista de compras recentes (`getSessionHistory`) com badge "Em andamento"
-    para sessão ativa — usar `ListRow` (provavelmente com `subtitle` + `rightContent`)
-  - Filtros: por mercado e por período (esta semana / este mês / últimos 3 meses)
-  - Se tiver botão de "Exportar histórico" no rodapé: `ActionBar` com 1 botão primary
-- Tocar produto no histórico → reaproveitar `app/modals/item-detail.tsx` já
-  pronto. No Stage 4, adicionar gráfico de variação de preço (react-native-svg
-  - dados do `getProductPriceHistory`).
+**Stage 7 — Export/import CSV**:
+- `services/csv.ts` com `exportToCSV()` e `importFromCSV(uri)`.
+- Botões em `app/settings.tsx` integrando com `expo-file-system`,
+  `expo-sharing`, `expo-document-picker` (todos já instalados).
+- Formato: `data,mercado,produto,categoria,preco,quantidade,subtotal`.
 
-Queries do banco para isso já existem em `database/queries/sessions.ts` e
-`markets.ts` — só consumir.
+**Stages 8–10** — UI da IA, integração real, polish (ver Seção 2).
 
 ---
 
@@ -265,6 +265,10 @@ Queries do banco para isso já existem em `database/queries/sessions.ts` e
   - `779ccc5` — Stage 3 (Carrinho)
   - `f782140` — Design system base (IconBox/Card/SectionHeader/ListRow)
   - `6113f46` — ActionBar + botões de rodapé padronizados
+  - `7bcf3ff` — Mercados como cards swipeable + DeleteMarketSheet
+  - `e21e48a` — Stage 4 (Histórico)
+  - `93108ed` — Stage 5 (Listas nomeadas, migration 003)
+  - `d3b58c9` — Fix layout list-detail (2 SwipeListViews + ScrollView pai)
 - **Memórias do Claude na máquina local**:
   `~/.claude/projects/<project-slug>/memory/`. Em PC novo essas memórias
   começam vazias — este `CLAUDE.md` é o ponto de entrada do contexto e

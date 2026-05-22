@@ -31,7 +31,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O Fynner precisa da câmera para escanear etiquetas de preço."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
