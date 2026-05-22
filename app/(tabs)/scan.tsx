@@ -272,22 +272,47 @@ export default function ScanScreen() {
         </View>
 
         <View style={{ flex: 1, paddingHorizontal: 14, gap: 14 }}>
-          {/* Preview da foto */}
+          {/* Preview da foto com botão de descartar no canto */}
           <View
             style={{
               alignSelf: "center",
               width: 160,
               height: 120,
               borderRadius: 14,
-              overflow: "hidden",
               borderWidth: 0.5,
               borderColor: theme.accentBorder,
+              // Sem overflow:hidden no wrapper pra deixar o X "vazar" os
+              // cantos do preview e ficar mais fácil de tocar.
             }}
           >
             <Image
               source={{ uri: photoUri }}
-              style={{ width: "100%", height: "100%" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: 14,
+              }}
             />
+            <TouchableOpacity
+              onPress={handleRetake}
+              accessibilityLabel="Descartar foto"
+              hitSlop={8}
+              style={{
+                position: "absolute",
+                top: -8,
+                right: -8,
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: "rgba(0, 0, 0, 0.75)",
+                borderWidth: 1,
+                borderColor: "rgba(255, 255, 255, 0.6)",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="close" size={16} color="#fff" />
+            </TouchableOpacity>
           </View>
 
           {/* Campo nome */}
