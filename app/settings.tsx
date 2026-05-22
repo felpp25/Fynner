@@ -22,6 +22,7 @@ import {
   View,
 } from "react-native";
 
+import { ActionBar } from "@/components/ui/ActionBar";
 import { ListRow } from "@/components/ui/ListRow";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { palette } from "@/constants/Colors";
@@ -116,10 +117,15 @@ export default function SettingsScreen() {
     setImportState({ phase: "idle" });
   }
 
+  // ActionBar não tem loading nativo (ver CLAUDE.md §7); usamos disabled
+  // enquanto a ação está em andamento. Visual: opacity 0.5.
+  const importing =
+    importState.phase === "importing" || importState.phase === "preview";
+
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScrollView
-        style={{ flex: 1, backgroundColor: theme.background }}
+        style={{ flex: 1 }}
         contentContainerStyle={{ padding: 14 }}
       >
         <SectionHeader>Aparência</SectionHeader>
@@ -140,32 +146,20 @@ export default function SettingsScreen() {
 
         <SectionHeader marginTop={20}>Dados</SectionHeader>
 
-        <ListRow
-          icon="download-outline"
-          title="Exportar histórico (CSV)"
-          subtitle={
-            exporting
-              ? "Gerando arquivo…"
-              : "Baixe seus dados para abrir em planilha ou backup"
-          }
-          showArrow={!exporting}
-          rightContent={
-            exporting ? (
-              <ActivityIndicator size="small" color={palette.accent} />
-            ) : undefined
-          }
-          onPress={exporting ? undefined : handleExport}
-        />
-
-        <ListRow
-          icon="cloud-upload-outline"
-          title="Importar backup (CSV)"
-          subtitle="Restaure dados de uma exportação anterior"
-          showArrow
-          onPress={
-            importState.phase === "idle" ? handlePickImport : undefined
-          }
-        />
+        <Text
+          style={{
+            fontSize: 12,
+            color: theme.textMuted,
+            lineHeight: 18,
+            paddingHorizontal: 4,
+            paddingTop: 2,
+            paddingBottom: 4,
+          }}
+        >
+          Exporte um CSV com todo o seu histórico (compatível com Excel e
+          Sheets) ou importe um backup anterior. Linhas duplicadas são
+          puladas automaticamente.
+        </Text>
 
         <SectionHeader marginTop={20}>Sobre</SectionHeader>
 
@@ -176,12 +170,31 @@ export default function SettingsScreen() {
         />
       </ScrollView>
 
+      <ActionBar
+        buttons={[
+          {
+            label: exporting ? "Exportando…" : "Exportar",
+            icon: "download-outline",
+            variant: "primary",
+            onPress: handleExport,
+            disabled: exporting || importing,
+          },
+          {
+            label: "Importar",
+            icon: "cloud-upload-outline",
+            variant: "ghost",
+            onPress: handlePickImport,
+            disabled: importing || exporting,
+          },
+        ]}
+      />
+
       <ImportModal
         state={importState}
         onConfirm={handleConfirmImport}
         onClose={handleCloseModal}
       />
-    </>
+    </View>
   );
 }
 
