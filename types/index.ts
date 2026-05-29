@@ -112,3 +112,14 @@ export interface MarketComparison {
   total_medio: number;
   total_visitas: number;
 }
+
+/**
+ * Mensagem da conversa com a Fynner IA (Sub-stage 8b).
+ * Persistida em `ai_messages` via migration 004.
+ */
+export interface AIMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}

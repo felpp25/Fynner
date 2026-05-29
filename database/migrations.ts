@@ -67,6 +67,27 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    /**
+     * Mensagens da conversa com a Fynner IA (Sub-stage 8b). Só user/assistant
+     * são persistidos — tool_calls e tool_results ficam efêmeros no service.
+     * Índice em created_at acelera o ORDER BY usado tanto na UI quanto no
+     * recorte das últimas N mensagens enviadas como contexto à OpenAI.
+     */
+    id: "004_ai_messages",
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS ai_messages (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          role        TEXT    NOT NULL CHECK (role IN ('user', 'assistant')),
+          content     TEXT    NOT NULL,
+          created_at  TEXT    DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ai_messages_created_at ON ai_messages(created_at);
+      `);
+    },
+  },
 ];
 
 /**
