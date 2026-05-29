@@ -1,17 +1,16 @@
 /**
- * Tela Fynner IA (Sub-stage 8b).
+ * Tela Fynner IA (Sub-stage 8b + 8c).
  *
  * Chat com persistência em SQLite (tabela ai_messages, migration 004).
  * Integra com OpenAI GPT-4o-mini via tool calling — ver services/ai.ts.
+ * Reconhecimento de voz via expo-speech-recognition — ver services/voice.ts.
  *
  * Layout:
- *   - Header: avatar + nome + status (verde=pronto, amarelo=pensando) + botão limpar
+ *   - Header: avatar + nome + status (verde=pronto, amarelo=pensando, roxo=ouvindo) + botão limpar
  *   - Chips horizontais (perguntas pré-prontas)
  *   - Body: FlatList de bubbles OU empty state
- *   - Footer: input + mic (stub) + send
- *
- * Voz é stub neste sub-stage — botão mic visível mas desabilitado. Implementação
- * real fica para o Sub-stage 8c (@react-native-voice/voice + RECORD_AUDIO).
+ *   - Footer: input + mic (tap-tap pra gravar) + send
+ *   - Overlay de gravação sobreposto quando isListening
  */
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
@@ -31,6 +30,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatBubble } from "@/components/ai/ChatBubble";
 import { QuickPromptChip } from "@/components/ai/QuickPromptChip";
 import { TypingIndicator } from "@/components/ai/TypingIndicator";
+import { VoiceOverlay } from "@/components/ai/VoiceOverlay";
 import {
   addMessage,
   clearAllMessages,
@@ -38,7 +38,9 @@ import {
   getRecentMessages,
 } from "@/database/queries/ai";
 import { useTheme } from "@/hooks/useTheme";
+import { useVoice } from "@/hooks/useVoice";
 import { AI_AVAILABLE, askAI } from "@/services/ai";
+import { VOICE_AVAILABLE } from "@/services/voice";
 import type { AIMessage } from "@/types";
 
 interface QuickPrompt {
@@ -84,6 +86,15 @@ export default function AiScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const {
+    isListening,
+    transcript: voiceTranscript,
+    error: voiceError,
+    start: startVoice,
+    stop: stopVoice,
+    cancel: cancelVoice,
+  } = useVoice();
+
   // useFocusEffect recarrega ao voltar pra aba — usuário pode ter limpado
   // a conversa em outro lugar (improvável hoje, mas baixo custo de mantê-lo).
   useFocusEffect(
@@ -115,6 +126,27 @@ export default function AiScreen() {
     }, 100);
     return () => clearTimeout(t);
   }, [messages.length, isProcessing]);
+
+  // Auto-envio quando a gravação de voz termina com texto válido.
+  // wasListeningRef captura o valor anterior de isListening — quando ele
+  // transiciona de true → false e existe transcript, envia automaticamente.
+  // O `cancel()` do hook zera o transcript antes de setar isListening=false,
+  // então cancel correto NÃO dispara o envio.
+  const wasListeningRef = useRef(false);
+  useEffect(() => {
+    if (
+      wasListeningRef.current &&
+      !isListening &&
+      voiceTranscript.trim().length > 0
+    ) {
+      handleSend(voiceTranscript);
+    }
+    wasListeningRef.current = isListening;
+    // handleSend e voiceTranscript fora das deps de propósito — só queremos
+    // disparar na transição de isListening (callback usa o transcript capturado
+    // no momento exato da transição).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isListening]);
 
   async function handleSend(textOverride?: string) {
     const userText = (textOverride ?? input).trim();
@@ -211,13 +243,29 @@ export default function AiScreen() {
                   width: 6,
                   height: 6,
                   borderRadius: 3,
-                  backgroundColor: isProcessing
-                    ? PROCESSING_YELLOW
-                    : SUCCESS_GREEN,
+                  backgroundColor: voiceError
+                    ? DANGER_PINK
+                    : isListening
+                      ? theme.accent
+                      : isProcessing
+                        ? PROCESSING_YELLOW
+                        : SUCCESS_GREEN,
                 }}
               />
-              <Text style={{ fontSize: 10, color: theme.textMuted }}>
-                {isProcessing ? "Pensando..." : "Pronto para responder"}
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: voiceError ? DANGER_PINK : theme.textMuted,
+                }}
+                numberOfLines={1}
+              >
+                {voiceError
+                  ? voiceError
+                  : isListening
+                    ? "Ouvindo..."
+                    : isProcessing
+                      ? "Pensando..."
+                      : "Pronto para responder"}
               </Text>
             </View>
           </View>
@@ -397,23 +445,36 @@ export default function AiScreen() {
           />
         </View>
 
-        {/* Mic stub — habilitado no Sub-stage 8c */}
+        {/* Mic — tap pra começar a gravar. Overlay assume a partir daí. */}
         <TouchableOpacity
-          disabled
-          accessibilityLabel="Gravar áudio (em breve)"
+          onPress={() => {
+            if (isListening) {
+              stopVoice();
+            } else {
+              startVoice();
+            }
+          }}
+          disabled={isProcessing || !VOICE_AVAILABLE}
+          accessibilityLabel={
+            isListening ? "Parar gravação" : "Gravar pergunta por voz"
+          }
           style={{
             width: 36,
             height: 36,
             borderRadius: 18,
-            backgroundColor: theme.card,
+            backgroundColor: isListening ? theme.accent : theme.card,
             borderWidth: 0.5,
-            borderColor: theme.accentBorder,
+            borderColor: isListening ? theme.accent : theme.accentBorder,
             justifyContent: "center",
             alignItems: "center",
-            opacity: 0.4,
+            opacity: isProcessing || !VOICE_AVAILABLE ? 0.4 : 1,
           }}
         >
-          <Ionicons name="mic-outline" size={16} color={theme.accentLight} />
+          <Ionicons
+            name={isListening ? "mic" : "mic-outline"}
+            size={16}
+            color={isListening ? "#fff" : theme.accentLight}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -433,6 +494,13 @@ export default function AiScreen() {
           <Ionicons name="arrow-up" size={16} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      <VoiceOverlay
+        visible={isListening}
+        transcript={voiceTranscript}
+        onCancel={cancelVoice}
+        onStop={stopVoice}
+      />
     </KeyboardAvoidingView>
   );
 }

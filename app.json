@@ -19,7 +19,8 @@
     "android": {
       "package": "com.felpp25.fynner",
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -40,6 +41,13 @@
         "expo-camera",
         {
           "cameraPermission": "O Fynner precisa da câmera para escanear etiquetas de preço."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "O Fynner precisa do microfone para você fazer perguntas falando com a IA.",
+          "speechRecognitionPermission": "O Fynner usa reconhecimento de voz para transcrever suas perguntas."
         }
       ]
     ],
