@@ -40,7 +40,7 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | 5 — Listas             | ✅ pronto   | Migration 003 (`listas` + `lista_itens.lista_id`); `ListCard`, `ListItemRow`, `NewListSheet`, `AddItemSheet`; tela `list.tsx` + `modals/list-detail.tsx` |
 | 6 — Scanner OCR        | ✅ pronto   | UI completa + OCR real via ML Kit (commit `69d6d7c`). Crop programático pela região da moldura via `expo-image-manipulator`; `extractName` com heurísticas robustas (filtra lixo + pontua por caixa alta/letras/posição antes do preço); `extractPrice` pega o maior valor `\d+[.,]\d{2}` |
 | 7 — Export/import CSV  | ✅ pronto   | `services/csv.ts` com parser RFC 4180; botões em Configurações; preview/result modal; dedup por (data+mercado+produto+preço)            |
-| 8 — Fynner IA          | 🟡 em andamento | Sub-stages: 8a ✅ (dev client + OCR real), 8b ✅ (chat + OpenAI tool calling via fetch direto), 8c ⏳ (voz nativa)                       |
+| 8 — Fynner IA          | ✅ pronto       | Sub-stages: 8a ✅ (dev client + OCR real), 8b ✅ (chat + OpenAI tool calling), 8c ✅ (voz nativa pt-BR via `expo-speech-recognition`)     |
 | ~~9~~                  | mesclado    | Decisão (2026-05-22): Stage 9 absorvido pelo 8b. IA real desde o início com OpenAI GPT-4o-mini + tool calling sobre queries do banco. Key local no `.env` durante dev (não distribuir builds com a key embutida).                                                                                |
 | 10 — Polish            | ⏳ pendente | Onboarding, edge cases, animações                                                                                                    |
 
@@ -66,7 +66,7 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | Storage prefs    | @react-native-async-storage/async-storage `2.2.0`     | versão é fixada pelo SDK 54 — `npx expo install` quando atualizar |
 | Tipagem          | TypeScript strict                                     | sem `any` explícito                                               |
 | Câmera + OCR (Stage 6) | expo-camera + `@react-native-ml-kit/text-recognition` + `expo-image-manipulator` | Todos instalados e ativos. App agora roda como **dev client** (não mais Expo Go) — Sub-stage 8a (`69d6d7c`) |
-| Voz (Stage 8c)         | `@react-native-voice/voice`                                                       | a instalar quando começarmos o Sub-stage 8c                                                                  |
+| Voz (Stage 8c)         | `expo-speech-recognition`                                                         | ✅ ativo via `services/voice.ts` + `hooks/useVoice.ts` (commit `ab9cc3f`). Idioma pt-BR forçado. Tap-tap: toca pra começar, toca no mic central pra enviar. **Decisão**: trocamos `@react-native-voice/voice` por `expo-speech-recognition` durante a Fase 1 — API mais idiomática Expo, melhor integração com SDK 54, suporte oficial |
 | IA (Stage 8b)          | OpenAI GPT-4o-mini via fetch direto                                               | ✅ ativo via `services/ai.ts` (commit `2be04dc`). Sem SDK, chamada HTTP direta. API key em `EXPO_PUBLIC_OPENAI_API_KEY` no `.env` local (NUNCA committar) |
 | Swipe-delete     | `react-native-swipe-list-view`                        | já instalado                                                      |
 
@@ -159,6 +159,20 @@ fynner/
   A UI consome essa flag pra mostrar/esconder funcionalidade e/ou banners
   explicativos. Exemplos: `OCR_AVAILABLE` (services/ocr.ts), `AI_AVAILABLE`
   (services/ai.ts), futuro `VOICE_AVAILABLE` (services/voice.ts no Stage 8c).
+- **`wasListeningRef` pra detectar transição de estado:** quando precisar
+  reagir a uma transição específica de boolean (ex: `isListening` indo de
+  `true` → `false`), usar um `useRef<boolean>` ao lado do `useEffect`. Não
+  derivar do `useState` anterior porque o efeito não tem acesso ao valor
+  anterior. Padrão aplicado em `app/(tabs)/ai.tsx` pra disparar auto-envio
+  da pergunta gravada por voz exatamente uma vez quando a gravação termina.
+  Cuidado importante: incluir só a variável principal nas deps (`[isListening]`),
+  não o transcript — senão o efeito re-roda em cada partial result e pode
+  disparar envio múltiplo.
+- **Limpar transcript ANTES de mudar isListening em cancel:** no
+  `hooks/useVoice.ts`, a função `cancel()` zera o transcript antes de setar
+  `isListening = false`. Sem essa ordem, o useEffect de auto-envio veria
+  `transcript` ainda preenchido e dispararia envio acidental ao cancelar.
+  Race condition sutil mas real — vale registrar.
 
 ### Design system — obrigatório
 
@@ -244,7 +258,7 @@ git push                    # ao sair
   não conectar ao Metro do PC, checar se a Wi-Fi está classificada como
   `Public` no Windows e mudar para `Private` (requer Admin). Fallback que
   sempre funciona: `npm start -- --tunnel`.
-- **Build vs Expo Go**: a partir do Sub-stage 8a (commit `69d6d7c`), o app não roda mais no Expo Go. Pra rodar, é necessário ter o APK do dev client instalado no celular e o Metro rodando no PC (`npm start`). Pra **adicionar módulo nativo novo** (ex: `expo-image-manipulator`, `@react-native-voice/voice`), é obrigatório fazer:
+- **Build vs Expo Go**: a partir do Sub-stage 8a (commit `69d6d7c`), o app não roda mais no Expo Go. Pra rodar, é necessário ter o APK do dev client instalado no celular e o Metro rodando no PC (`npm start`). Pra **adicionar módulo nativo novo** (ex: `expo-image-manipulator`, `expo-speech-recognition`), é obrigatório fazer:
   1. `npx expo install <pacote>` (não `npm install`)
   2. `npx expo prebuild --platform android --clean` (regenera pasta `android/` com Gradle ciente do módulo)
   3. `eas build --profile development --platform android` (sobe nova build pra nuvem)
@@ -266,49 +280,77 @@ git push                    # ao sair
   pessoa com conhecimento técnico consegue extrair. **Nunca distribuir build
   com a key embutida** (família, beta, lojas). Quando o app virar produto pago,
   migrar para backend próprio que faz a chamada à OpenAI server-side.
+- **`expo-speech-recognition` precisa de plugin no `app.json`** com strings
+  de permissão em PT-BR. Sem isso, o app crasha ao tentar `requestPermissionsAsync`.
+  Plugin estruturado assim:
+  ```json
+  "plugins": [
+    ["expo-speech-recognition", {
+      "microphonePermission": "O Fynner usa o microfone para você fazer perguntas por voz",
+      "speechRecognitionPermission": "O Fynner usa reconhecimento de voz para entender suas perguntas"
+    }]
+  ]
+  ```
+- **Glow animado em sombras quebra TS strict**: `shadowOpacity: animatedValue`
+  não é tipável corretamente em RN sem `as any`. Solução: usar só `transform: [{ scale }]`
+  pra pulsar elementos (ex: VoiceOverlay), 100% no native driver, sem cast.
+- **`Animated.loop` precisa de cleanup**: sempre `return () => animation.stop()`
+  no useEffect. Sem isso, animações continuam rodando após unmount → memory leak.
+  Padrão aplicado em `TypingIndicator.tsx` (3 dots) e `VoiceOverlay.tsx` (mic pulsante).
 
 ---
 
 ## 8. Próximos passos
 
-### Sub-stage 8c — Voz nativa (próximo)
+### Stage 10 — Polish e onboarding (último stage de feature)
 
-- Instalar `@react-native-voice/voice` (módulo nativo — **exige rebuild EAS**).
-- Adicionar `RECORD_AUDIO` em `app.json` permissions.
-- Sequência obrigatória ao instalar módulo nativo (lição do 8a):
-  1. `npx expo install @react-native-voice/voice`
-  2. `npx expo prebuild --platform android --clean`
-  3. `eas build --profile development --platform android`
-  4. Instalar novo APK por cima do antigo (dados SQLite preservados)
-- Implementar `services/voice.ts` com `VOICE_AVAILABLE` flag.
-- Hook `useVoice()` encapsulando `startListening`, `stopListening`, `transcript`,
-  `isListening`.
-- Overlay de gravação na tela `ai.tsx` (mockup já aprovado): mic grande pulsante,
-  texto transcrito em tempo real, botão "toque no mic para enviar".
-- Substituir o botão mic stub (opacity 0.4, disabled) por versão funcional:
-  toca uma vez pra começar, toca de novo pra parar e enviar.
-- Idioma forçado em pt-BR (sem autodetect).
+Esse stage não tem urgência — o app já é funcionalmente completo desde o
+fechamento do Stage 8. Sugestões pra incluir:
 
-### Stage 10 — Polish e onboarding (último)
+- **Onboarding** na primeira abertura — apresenta cada aba com tooltip ou
+  swipe horizontal. Ideal: 3-4 telas curtas (Carrinho, Scan, IA, Histórico).
+- **Edge cases revelados pelo uso real** — bugs sutis que só aparecem com
+  uso de dias/semanas. Sugestão: usar o app por 1-2 semanas antes de
+  começar o Stage 10 pra ter lista real de coisas a corrigir.
+- **Animações sutis** — transições entre telas, microinterações em botões,
+  shake/spring quando um botão é desabilitado, etc. Aplicar com moderação.
+- **Empty states melhores** — Histórico vazio, Lista vazia, Mercados zerados.
+  Hoje funcionam mas são genéricos.
+- **Acessibilidade** — auditar `accessibilityLabel` em todos os botões com
+  ícone-only (regra já em `patterns.md`). Confirmar que screen reader
+  consegue navegar a tela de IA.
 
-- Onboarding na primeira abertura (apresenta cada aba).
-- Edge cases revelados pelo uso real.
-- Animações sutis (transições entre telas, microinterações).
-- **Decisão sobre monetização** — manter API key local (uso pessoal) ou
-  migrar para backend próprio + assinatura (modelo Spotify discutido em
-  2026-05-22). Backend mínimo: Cloudflare Worker + RevenueCat + auth anônimo
-  por device ID.
+### Decisão de monetização (não bloqueia o Stage 10)
+
+A API key da OpenAI está embutida no APK durante desenvolvimento. Pra
+distribuir o app pra qualquer pessoa além de você, precisa:
+
+- **Caminho A — uso pessoal**: continuar como está. Build assinado, instala
+  no celular pra família/amigos com aviso "este APK tem minha key embutida".
+- **Caminho B — produto pago**: backend próprio (Cloudflare Worker mínimo)
+  + assinatura (RevenueCat) + auth anônimo por device ID. Discutido em
+  2026-05-22. ~1-2 semanas de trabalho pra montar.
+
+Recomendação: usar o app por algumas semanas em uso pessoal antes de decidir.
+Se prevalecer o desejo de monetizar, o Caminho B é viável e o app está
+arquiteturalmente pronto pra ele (não tem nada acoplado à OpenAI fora do
+`services/ai.ts` — fácil trocar pelo backend).
 
 ### Pendências de documentação
 
 - **Verde no design system** documentado em CLAUDE.md mas falta consolidar
   em `docs/uiux/design-tokens.md` (próxima atualização da skill).
 - **Padrão `XXX_AVAILABLE`** documentado na Seção 5 do CLAUDE.md mas falta
-  adicionar em `docs/uiux/patterns.md` com exemplos de OCR_AVAILABLE e
-  AI_AVAILABLE.
+  adicionar em `docs/uiux/patterns.md` com exemplos completos
+  (`OCR_AVAILABLE`, `AI_AVAILABLE`, `VOICE_AVAILABLE`).
+- **Padrão de overlay de voz** (mic pulsante, transcript em tempo real,
+  tap-pra-parar via Pressable) merece doc própria em
+  `docs/uiux/patterns.md` na próxima atualização da skill.
 - **Padrão de tool calling** (estrutura híbrida: poucas tools compostas +
-  uma tool de busca) merece doc própria em `docs/uiux/patterns.md` quando
-  formos atualizar a skill.
+  uma tool de busca) também merece doc própria.
+- **Convenção de service `XXX-test.ts` temporário** para validação seca
+  durante desenvolvimento (removido antes do commit final). Padrão usado
+  em `ai-test.ts` (8b) e `voice-test.ts` (8c).
 
 ---
 
@@ -330,6 +372,7 @@ git push                    # ao sair
   - `cc92722` — Settings: Export/Import vira ActionBar fixo
   - `69d6d7c` — **Sub-stage 8a**: dev client (EAS) + OCR real (ML Kit) + crop pela moldura
   - `2be04dc` — **Sub-stage 8b**: IA por texto com OpenAI tool calling + persistência (migration 004, services/ai.ts, components/ai/, tela ai.tsx)
+  - `ab9cc3f` — **Sub-stage 8c**: voz nativa com `expo-speech-recognition` (services/voice.ts, hooks/useVoice.ts, VoiceOverlay, tap-tap auto-envio). **Stage 8 completo.**
 - **Memórias do Claude na máquina local**:
   `~/.claude/projects/<project-slug>/memory/`. Em PC novo essas memórias
   começam vazias — este `CLAUDE.md` é o ponto de entrada do contexto e
