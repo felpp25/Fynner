@@ -1,20 +1,17 @@
 /**
  * Serviço de OCR — detecta nome e preço em etiquetas de supermercado.
  *
- * STATUS: stub. A captura de imagem (expo-camera) já funciona em Expo Go,
- * mas o reconhecimento de texto requer `@react-native-ml-kit/text-recognition`,
- * que é nativo e precisa de prebuild + dev client. Mantemos a interface
- * pronta para que a UI da tela `scan.tsx` continue funcionando hoje (modo
- * manual) e o usuário possa preencher nome/preço; quando o ML Kit for
- * integrado, basta substituir a implementação de `recognizeText`.
+ * STATUS: ATIVO. `@react-native-ml-kit/text-recognition` instalado e
+ * vinculado nativamente via prebuild (requer dev client; não roda em
+ * Expo Go). A tela `scan.tsx` consome `OCR_AVAILABLE` pra esconder o
+ * banner de modo manual.
  *
- * Heurística projetada (a aplicar quando o texto bruto existir):
- *   - Regex de preço: `/R\$?\s*(\d+[.,]\d{2})/i` e `/\b\d+[.,]\d{2}\b/`
- *     — se houver vários candidatos, escolher o MAIOR valor (geralmente o
- *     preço unitário, não centavos por unidade).
- *   - Nome: linha mais comprida em CAIXA ALTA acima do preço, ou primeira
- *     linha não-numérica.
+ * Heurística do parser de texto bruto:
+ *   - Preço: `/\d+[.,]\d{2}/g` — se houver vários candidatos, escolhe o
+ *     MAIOR (preço unitário, não centavos por unidade).
+ *   - Nome: linha alfanumérica mais longa (geralmente o nome principal).
  */
+import TextRecognition from "@react-native-ml-kit/text-recognition";
 
 export interface OcrResult {
   /** Texto bruto reconhecido. Vazio se o motor não estiver disponível. */
@@ -43,41 +40,105 @@ export function extractPrice(text: string): number | null {
 }
 
 /**
- * Tenta extrair o nome do produto: primeira linha "longa" (>=3 chars)
- * que NÃO seja só dígitos/símbolos. Heurística simples — melhorar quando
- * tivermos amostras reais de etiquetas.
+ * Heurística melhorada para extrair o nome do produto de um texto OCR.
+ *
+ * Estratégia em 3 passos:
+ *  1. Filtra linhas que claramente não são nome de produto (nomes de arquivo,
+ *     URLs, linhas só com números/símbolos, palavras técnicas isoladas)
+ *  2. Pontua cada linha sobrevivente baseado em:
+ *     - Quantidade de letras (mais letras = melhor)
+ *     - Caixa alta (etiquetas brasileiras usam — bonus)
+ *     - Tamanho razoável (3-50 chars)
+ *     - Posição no texto (linhas que vêm antes do preço ganham bonus —
+ *       em etiquetas brasileiras o nome geralmente fica acima do preço)
+ *  3. Retorna a linha de maior pontuação
+ *
+ * Se nenhuma linha passar nos filtros, retorna null (usuário preenche
+ * manualmente — a tela Scan já trata esse caso).
  */
 export function extractName(text: string): string | null {
   if (!text) return null;
+
   const linhas = text
     .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l.length >= 3 && /[a-zA-ZÀ-ÿ]/.test(l));
+    .filter((l) => l.length >= 3);
+
   if (linhas.length === 0) return null;
-  // Ordena por comprimento desc e pega a primeira (geralmente o nome principal)
-  linhas.sort((a, b) => b.length - a.length);
-  return linhas[0];
+
+  // Em que linha o preço aparece — usado pra bonus de posição.
+  const priceLineIndex = linhas.findIndex((l) => /\d+[.,]\d{2}/.test(l));
+
+  // Padrões que indicam "lixo" (não é nome de produto).
+  const padroesLixo = [
+    /\.(jpg|jpeg|png|webp|gif|pdf|csv|xlsx?)/i, // extensões de arquivo
+    /\(\d+x\d+\)/, // dimensões tipo "(1600x900)"
+    /https?:\/\//i, // URLs
+    /^[\d\W]+$/, // só dígitos e símbolos
+    /^(R\$|preço|preco|kg|un|cód|cod|valid|venc)$/i, // termos técnicos
+  ];
+
+  function isLixo(linha: string): boolean {
+    return padroesLixo.some((regex) => regex.test(linha));
+  }
+
+  function contaLetras(linha: string): number {
+    return (linha.match(/[a-zA-ZÀ-ÿ]/g) || []).length;
+  }
+
+  function ehCaixaAlta(linha: string): boolean {
+    const letras = linha.match(/[a-zA-ZÀ-ÿ]/g);
+    if (!letras || letras.length < 3) return false;
+    return letras.every((c) => c === c.toUpperCase());
+  }
+
+  const candidatos = linhas
+    .map((linha, index) => {
+      if (isLixo(linha)) return null;
+
+      const letras = contaLetras(linha);
+      if (letras < 3) return null;
+
+      let score = letras;
+      if (ehCaixaAlta(linha)) score += 10;
+      if (linha.length >= 5 && linha.length <= 50) score += 5;
+      // Etiquetas brasileiras põem o nome acima do preço.
+      if (priceLineIndex !== -1 && index < priceLineIndex) score += 15;
+      // Linha que contém o preço quase certamente NÃO é o nome.
+      if (/\d+[.,]\d{2}/.test(linha)) score -= 20;
+
+      return { linha, score };
+    })
+    .filter((c): c is { linha: string; score: number } => c !== null);
+
+  if (candidatos.length === 0) return null;
+
+  candidatos.sort((a, b) => b.score - a.score);
+  return candidatos[0].linha;
 }
 
 /**
- * Função principal — recebe URI de uma imagem capturada e retorna o
- * resultado. Por enquanto, retorna placeholder vazio (modo manual).
+ * Função principal — recebe URI de uma imagem capturada, dispara o ML Kit
+ * e aplica a heurística pra extrair nome + preço.
  *
- * Quando ML Kit for instalado:
- *   import TextRecognition from '@react-native-ml-kit/text-recognition';
- *   const result = await TextRecognition.recognize(uri);
- *   const rawText = result.text;
- *   return { rawText, nome: extractName(rawText), preco: extractPrice(rawText) };
+ * Se o motor falhar (foto corrompida, módulo nativo indisponível, etc.),
+ * captura o erro e retorna resultado vazio — o usuário continua podendo
+ * digitar manualmente os campos na tela Scan.
  */
-export async function recognizeText(_imageUri: string): Promise<OcrResult> {
-  // Stub: até o ML Kit ser integrado, devolve resultado vazio.
-  // A tela Scan trata isso mostrando os campos vazios para preenchimento manual.
-  return {
-    rawText: "",
-    nome: null,
-    preco: null,
-  };
+export async function recognizeText(imageUri: string): Promise<OcrResult> {
+  try {
+    const result = await TextRecognition.recognize(imageUri);
+    const rawText = result.text || "";
+    return {
+      rawText,
+      nome: extractName(rawText),
+      preco: extractPrice(rawText),
+    };
+  } catch (err) {
+    console.error("[ocr] falha ao reconhecer texto:", err);
+    return { rawText: "", nome: null, preco: null };
+  }
 }
 
 /** Indica à UI se o OCR está realmente disponível ou em modo manual. */
-export const OCR_AVAILABLE = false;
+export const OCR_AVAILABLE = true;

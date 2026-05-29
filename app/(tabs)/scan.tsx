@@ -17,6 +17,7 @@ import {
   useCameraPermissions,
   type CameraView as CameraViewType,
 } from "expo-camera";
+import * as ImageManipulator from "expo-image-manipulator";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -63,15 +64,49 @@ export default function ScanScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.7,
-        // base64 só seria útil pra OCR em web; em mobile passamos URI direto
       });
       if (!photo?.uri) {
         setProcessing(false);
         return;
       }
+      // Preview mostra a foto inteira; o crop abaixo é só pra reduzir
+      // o ruído de fundo que o OCR vê.
       setPhotoUri(photo.uri);
-      // Tenta OCR (stub por enquanto — vai retornar vazio)
-      const result: OcrResult = await recognizeText(photo.uri);
+
+      // Crop pela moldura: a viewfinder visual é 260×160 (aspect ratio
+      // ~1.625:1) centralizada na tela. Recortamos uma região proporcional
+      // do centro da foto (65% da largura) antes de mandar pro ML Kit.
+      // Se o crop falhar por qualquer motivo, seguimos com a foto inteira.
+      // API chainable do SDK 54+: manipulate → crop → renderAsync → saveAsync.
+      let ocrUri = photo.uri;
+      try {
+        const photoWidth = photo.width;
+        const photoHeight = photo.height;
+        const cropWidth = Math.floor(photoWidth * 0.65);
+        const cropHeight = Math.floor(cropWidth / 1.625);
+        const originX = Math.floor((photoWidth - cropWidth) / 2);
+        const originY = Math.floor((photoHeight - cropHeight) / 2);
+
+        const imageRef = await ImageManipulator.ImageManipulator.manipulate(
+          photo.uri
+        )
+          .crop({
+            originX,
+            originY,
+            width: cropWidth,
+            height: cropHeight,
+          })
+          .renderAsync();
+        const cropped = await imageRef.saveAsync({
+          compress: 0.9,
+          format: ImageManipulator.SaveFormat.JPEG,
+        });
+        ocrUri = cropped.uri;
+      } catch (cropErr) {
+        console.warn("[scan] crop falhou, usando foto inteira:", cropErr);
+      }
+
+      const result: OcrResult = await recognizeText(ocrUri);
       if (result.nome) setNome(result.nome);
       if (result.preco !== null) {
         // Recompõe a máscara a partir do número
