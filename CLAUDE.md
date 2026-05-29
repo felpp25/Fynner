@@ -40,7 +40,7 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | 5 — Listas             | ✅ pronto   | Migration 003 (`listas` + `lista_itens.lista_id`); `ListCard`, `ListItemRow`, `NewListSheet`, `AddItemSheet`; tela `list.tsx` + `modals/list-detail.tsx` |
 | 6 — Scanner OCR        | ✅ pronto   | UI completa + OCR real via ML Kit (commit `69d6d7c`). Crop programático pela região da moldura via `expo-image-manipulator`; `extractName` com heurísticas robustas (filtra lixo + pontua por caixa alta/letras/posição antes do preço); `extractPrice` pega o maior valor `\d+[.,]\d{2}` |
 | 7 — Export/import CSV  | ✅ pronto   | `services/csv.ts` com parser RFC 4180; botões em Configurações; preview/result modal; dedup por (data+mercado+produto+preço)            |
-| 8 — Fynner IA          | 🟡 em andamento | Sub-stages: 8a ✅ (dev client + OCR real), 8b ⏳ (chat + OpenAI tool calling), 8c ⏳ (voz nativa)                                       |
+| 8 — Fynner IA          | 🟡 em andamento | Sub-stages: 8a ✅ (dev client + OCR real), 8b ✅ (chat + OpenAI tool calling via fetch direto), 8c ⏳ (voz nativa)                       |
 | ~~9~~                  | mesclado    | Decisão (2026-05-22): Stage 9 absorvido pelo 8b. IA real desde o início com OpenAI GPT-4o-mini + tool calling sobre queries do banco. Key local no `.env` durante dev (não distribuir builds com a key embutida).                                                                                |
 | 10 — Polish            | ⏳ pendente | Onboarding, edge cases, animações                                                                                                    |
 
@@ -67,7 +67,7 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | Tipagem          | TypeScript strict                                     | sem `any` explícito                                               |
 | Câmera + OCR (Stage 6) | expo-camera + `@react-native-ml-kit/text-recognition` + `expo-image-manipulator` | Todos instalados e ativos. App agora roda como **dev client** (não mais Expo Go) — Sub-stage 8a (`69d6d7c`) |
 | Voz (Stage 8c)         | `@react-native-voice/voice`                                                       | a instalar quando começarmos o Sub-stage 8c                                                                  |
-| IA (Stage 8b)          | OpenAI GPT-4o-mini via fetch direto                                               | a instalar no Sub-stage 8b — sem SDK, chamada HTTP direta com API key em `EXPO_PUBLIC_OPENAI_API_KEY` (local) |
+| IA (Stage 8b)          | OpenAI GPT-4o-mini via fetch direto                                               | ✅ ativo via `services/ai.ts` (commit `2be04dc`). Sem SDK, chamada HTTP direta. API key em `EXPO_PUBLIC_OPENAI_API_KEY` no `.env` local (NUNCA committar) |
 | Swipe-delete     | `react-native-swipe-list-view`                        | já instalado                                                      |
 
 Configurações sutis:
@@ -148,6 +148,17 @@ fynner/
 - Comentários explicam **por quê**, não o que. O user (junior em mobile)
   prefere código claro com comentário em decisão não óbvia, sem comentários
   óbvios tipo `// soma 1 ao contador`.
+- **Tool calling com OpenAI:** o `services/ai.ts` usa fetch direto à
+  `chat/completions`. As 4 tools (`getFinancialOverview`, `getShoppingHistory`,
+  `getAllMarketsList`, `searchProducts`) consomem as queries existentes em
+  `database/queries/` e devolvem JSON compacto pro modelo. Loop limitado a 5
+  iterações como salvaguarda contra tool-call em loop. Histórico enviado limitado
+  às últimas 6 mensagens (controla tokens sem perder contexto recente).
+- **Padrão `XXX_AVAILABLE`:** quando um service depende de configuração externa
+  ou módulo nativo opcional, ele exporta uma constante `XXX_AVAILABLE` booleana.
+  A UI consome essa flag pra mostrar/esconder funcionalidade e/ou banners
+  explicativos. Exemplos: `OCR_AVAILABLE` (services/ocr.ts), `AI_AVAILABLE`
+  (services/ai.ts), futuro `VOICE_AVAILABLE` (services/voice.ts no Stage 8c).
 
 ### Design system — obrigatório
 
@@ -240,49 +251,64 @@ git push                    # ao sair
   4. Instalar o novo APK por cima do antigo (dados SQLite preservados)
 - **Módulos nativos JS-only não existem**: se ao adicionar um pacote o app crashar com `Cannot find native module 'XXX'`, é porque o módulo tem código nativo (Kotlin/Java) que precisa estar no APK. Hot reload do Metro só atualiza JS. Solução: rebuild EAS (passos acima).
 - **OCR com crop pela moldura** (Sub-stage 8a): `services/ocr.ts` está acoplado a `app/(tabs)/scan.tsx` por uma decisão importante — o crop é feito no `scan.tsx` ANTES de chamar `recognizeText`. Crop = 65% da largura da foto, centralizado, mantendo aspect 1.625:1 (proporção da moldura visual `260×160`). Se ajustar a moldura visual, ajustar também o ratio no `handleCapture`.
+- **Variáveis `EXPO_PUBLIC_*` são embutidas no bundle em build time** —
+  não lidas em runtime. Ao editar o `.env`, é obrigatório reiniciar o Metro
+  com `npx expo start --clear`. Sem o `--clear`, o bundle anterior é servido
+  e as variáveis novas não chegam ao app. Sintoma comum: `AI_AVAILABLE` continua
+  `false` mesmo após adicionar a key no `.env`.
+- **`KeyboardAvoidingView` no Android exige `behavior="height"`** (não
+  `undefined`) quando a tela tem tab bar nativa. Sem isso, o teclado cobre
+  o input. Padrão usado em todos os modais com TextInput do app (NewMarketSheet,
+  NewListSheet, AddItemSheet, FilterSheet, tela ai.tsx). iOS continua com
+  `behavior="padding"`.
+- **API key da OpenAI no `.env` é só pra desenvolvimento.** A variável
+  `EXPO_PUBLIC_OPENAI_API_KEY` fica embutida no bundle final do APK — qualquer
+  pessoa com conhecimento técnico consegue extrair. **Nunca distribuir build
+  com a key embutida** (família, beta, lojas). Quando o app virar produto pago,
+  migrar para backend próprio que faz a chamada à OpenAI server-side.
 
 ---
 
 ## 8. Próximos passos
 
-### Sub-stage 8b — UI da IA + OpenAI (próximo)
+### Sub-stage 8c — Voz nativa (próximo)
 
-- Tela `app/(tabs)/ai.tsx` com chat: bubbles do usuário (accent) e da IA (card),
-  chips de sugestões fixos abaixo do header ("Gasto deste mês", "Mercado mais
-  barato", "Produtos que mais subiram"), input + botão send.
-- `services/ai.ts` com cliente OpenAI (fetch direto, sem SDK) usando
-  `EXPO_PUBLIC_OPENAI_API_KEY` do `.env`. Tool calling sobre as 8 queries
-  do banco já existentes em `database/queries/`.
-- Persistência de conversa em SQLite (nova migration 004 com tabela `ai_messages`)
-  para sobreviver entre sessões. Histórico enviado à IA é limitado (últimas
-  N mensagens) para controlar tokens.
-- `services/voice.ts` stub com `VOICE_AVAILABLE = false`. Botão de mic aparece
-  desabilitado ou com banner explicativo.
-- **Não exige novo build EAS** — todas as mudanças são em JS/TS.
-
-### Sub-stage 8c — Voz nativa (depois do 8b)
-
-- Instalar `@react-native-voice/voice`.
+- Instalar `@react-native-voice/voice` (módulo nativo — **exige rebuild EAS**).
 - Adicionar `RECORD_AUDIO` em `app.json` permissions.
-- `npx expo prebuild --platform android --clean` + `eas build` (rebuild necessário).
-- Implementar `services/voice.ts` real e hook `useVoice()`.
-- Overlay de gravação na tela de IA.
-- Trocar `VOICE_AVAILABLE` pra `true`.
+- Sequência obrigatória ao instalar módulo nativo (lição do 8a):
+  1. `npx expo install @react-native-voice/voice`
+  2. `npx expo prebuild --platform android --clean`
+  3. `eas build --profile development --platform android`
+  4. Instalar novo APK por cima do antigo (dados SQLite preservados)
+- Implementar `services/voice.ts` com `VOICE_AVAILABLE` flag.
+- Hook `useVoice()` encapsulando `startListening`, `stopListening`, `transcript`,
+  `isListening`.
+- Overlay de gravação na tela `ai.tsx` (mockup já aprovado): mic grande pulsante,
+  texto transcrito em tempo real, botão "toque no mic para enviar".
+- Substituir o botão mic stub (opacity 0.4, disabled) por versão funcional:
+  toca uma vez pra começar, toca de novo pra parar e enviar.
+- Idioma forçado em pt-BR (sem autodetect).
 
 ### Stage 10 — Polish e onboarding (último)
 
-- Onboarding na primeira abertura.
+- Onboarding na primeira abertura (apresenta cada aba).
 - Edge cases revelados pelo uso real.
-- Animações.
-- Decisão sobre monetização (backend próprio, assinatura) ou manter API key
-  local (uso pessoal).
+- Animações sutis (transições entre telas, microinterações).
+- **Decisão sobre monetização** — manter API key local (uso pessoal) ou
+  migrar para backend próprio + assinatura (modelo Spotify discutido em
+  2026-05-22). Backend mínimo: Cloudflare Worker + RevenueCat + auth anônimo
+  por device ID.
 
-### Pendências menores
+### Pendências de documentação
 
-- **Verde no design system** já está documentado nas seções 5 e 10, mas falta
-  consolidar no `docs/uiux/design-tokens.md` (próxima atualização da skill).
-- **Padrão `XXX_AVAILABLE`** (introduzido em `services/ocr.ts`) deve ser
-  documentado em `docs/uiux/patterns.md`.
+- **Verde no design system** documentado em CLAUDE.md mas falta consolidar
+  em `docs/uiux/design-tokens.md` (próxima atualização da skill).
+- **Padrão `XXX_AVAILABLE`** documentado na Seção 5 do CLAUDE.md mas falta
+  adicionar em `docs/uiux/patterns.md` com exemplos de OCR_AVAILABLE e
+  AI_AVAILABLE.
+- **Padrão de tool calling** (estrutura híbrida: poucas tools compostas +
+  uma tool de busca) merece doc própria em `docs/uiux/patterns.md` quando
+  formos atualizar a skill.
 
 ---
 
@@ -303,6 +329,7 @@ git push                    # ao sair
   - `31e8567` — Stage 7: export/import CSV completos
   - `cc92722` — Settings: Export/Import vira ActionBar fixo
   - `69d6d7c` — **Sub-stage 8a**: dev client (EAS) + OCR real (ML Kit) + crop pela moldura
+  - `2be04dc` — **Sub-stage 8b**: IA por texto com OpenAI tool calling + persistência (migration 004, services/ai.ts, components/ai/, tela ai.tsx)
 - **Memórias do Claude na máquina local**:
   `~/.claude/projects/<project-slug>/memory/`. Em PC novo essas memórias
   começam vazias — este `CLAUDE.md` é o ponto de entrada do contexto e
