@@ -27,7 +27,7 @@ Features principais:
 
 ## 2. Status atual
 
-**Branch `dev` (trabalho do dia a dia)** — Stages 1–5 + UI do Stage 6 estão
+**Branch `dev` (trabalho do dia a dia)** — Stages 1–7 + Sub-stage 8a estão
 mergeados. **Branch `main`** sincronizada com `dev`.
 
 | Stage                  | Status      | Conteúdo                                                                                                                             |
@@ -38,10 +38,10 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | 3.5 — Design system    | ✅ pronto   | `IconBox`, `Card`, `SectionHeader`, `ListRow`, `ActionBar` + telas Carrinho/Mercado/Configurações refatoradas para usarem            |
 | 4 — Histórico          | ✅ pronto   | `SessionCard`, `InsightCard`, `MarketComparison`, `FilterSheet`, `SessionItemRow`, tela `history.tsx` + `modals/session-detail.tsx`  |
 | 5 — Listas             | ✅ pronto   | Migration 003 (`listas` + `lista_itens.lista_id`); `ListCard`, `ListItemRow`, `NewListSheet`, `AddItemSheet`; tela `list.tsx` + `modals/list-detail.tsx` |
-| 6 — Scanner OCR        | 🟡 parcial  | UI completa em Expo Go (câmera + viewfinder + captura + form). `services/ocr.ts` está stub; OCR real requer dev build + ML Kit nativo |
+| 6 — Scanner OCR        | ✅ pronto   | UI completa + OCR real via ML Kit (commit `69d6d7c`). Crop programático pela região da moldura via `expo-image-manipulator`; `extractName` com heurísticas robustas (filtra lixo + pontua por caixa alta/letras/posição antes do preço); `extractPrice` pega o maior valor `\d+[.,]\d{2}` |
 | 7 — Export/import CSV  | ✅ pronto   | `services/csv.ts` com parser RFC 4180; botões em Configurações; preview/result modal; dedup por (data+mercado+produto+preço)            |
-| 8 — UI da IA           | ⏳ pendente | Chat com respostas locais (banco)                                                                                                    |
-| 9 — Integração IA real | ⏳ pendente | API definida quando o user escolher modelo                                                                                           |
+| 8 — Fynner IA          | 🟡 em andamento | Sub-stages: 8a ✅ (dev client + OCR real), 8b ⏳ (chat + OpenAI tool calling), 8c ⏳ (voz nativa)                                       |
+| ~~9~~                  | mesclado    | Decisão (2026-05-22): Stage 9 absorvido pelo 8b. IA real desde o início com OpenAI GPT-4o-mini + tool calling sobre queries do banco. Key local no `.env` durante dev (não distribuir builds com a key embutida).                                                                                |
 | 10 — Polish            | ⏳ pendente | Onboarding, edge cases, animações                                                                                                    |
 
 ### Tentativas reprovadas (não repetir)
@@ -65,8 +65,9 @@ mergeados. **Branch `main`** sincronizada com `dev`.
 | Estado           | React Context + useReducer                            | sem Redux                                                         |
 | Storage prefs    | @react-native-async-storage/async-storage `2.2.0`     | versão é fixada pelo SDK 54 — `npx expo install` quando atualizar |
 | Tipagem          | TypeScript strict                                     | sem `any` explícito                                               |
-| Câmera (Stage 6) | expo-camera (instalado, com plugin no app.json)       | `@react-native-ml-kit/text-recognition` ainda **não** instalado — requer prebuild + dev client; OCR é stub em `services/ocr.ts` até decidir migrar |
-| Voz (Stage 8)    | `@react-native-voice/voice`                           | a instalar                                                        |
+| Câmera + OCR (Stage 6) | expo-camera + `@react-native-ml-kit/text-recognition` + `expo-image-manipulator` | Todos instalados e ativos. App agora roda como **dev client** (não mais Expo Go) — Sub-stage 8a (`69d6d7c`) |
+| Voz (Stage 8c)         | `@react-native-voice/voice`                                                       | a instalar quando começarmos o Sub-stage 8c                                                                  |
+| IA (Stage 8b)          | OpenAI GPT-4o-mini via fetch direto                                               | a instalar no Sub-stage 8b — sem SDK, chamada HTTP direta com API key em `EXPO_PUBLIC_OPENAI_API_KEY` (local) |
 | Swipe-delete     | `react-native-swipe-list-view`                        | já instalado                                                      |
 
 Configurações sutis:
@@ -176,8 +177,8 @@ fynner/
 npm install
 npx expo install --check    # confirma versões compatíveis com SDK 54
 
-# Rodar no dev
-npm start                   # abre Metro, escaneia QR no Expo Go
+# Rodar no dev (a partir do Sub-stage 8a o app roda como dev client, não mais Expo Go)
+npm start                   # abre Metro; abrir o app "Fynner" instalado no celular
 npx expo start --clear      # se o Metro estiver com cache antigo
 
 # Validar antes de commitar
@@ -228,34 +229,60 @@ git push                    # ao sair
   via `loading=true`, combinar em `disabled: isLoading || !canSubmit`. Se
   precisar de feedback forte, estender com `loading?: boolean` que renderiza
   `ActivityIndicator` no lugar do ícone.
-- **Firewall do Windows** bloqueia 8081 em redes `Public`. Se o Expo Go
-  não conectar no celular, checar se a Wi-Fi está classificada como `Public`
-  no Windows e mudar para `Private` (requer Admin). Fallback que sempre
-  funciona: `npm start -- --tunnel`.
+- **Firewall do Windows** bloqueia 8081 em redes `Public`. Se o dev client
+  não conectar ao Metro do PC, checar se a Wi-Fi está classificada como
+  `Public` no Windows e mudar para `Private` (requer Admin). Fallback que
+  sempre funciona: `npm start -- --tunnel`.
+- **Build vs Expo Go**: a partir do Sub-stage 8a (commit `69d6d7c`), o app não roda mais no Expo Go. Pra rodar, é necessário ter o APK do dev client instalado no celular e o Metro rodando no PC (`npm start`). Pra **adicionar módulo nativo novo** (ex: `expo-image-manipulator`, `@react-native-voice/voice`), é obrigatório fazer:
+  1. `npx expo install <pacote>` (não `npm install`)
+  2. `npx expo prebuild --platform android --clean` (regenera pasta `android/` com Gradle ciente do módulo)
+  3. `eas build --profile development --platform android` (sobe nova build pra nuvem)
+  4. Instalar o novo APK por cima do antigo (dados SQLite preservados)
+- **Módulos nativos JS-only não existem**: se ao adicionar um pacote o app crashar com `Cannot find native module 'XXX'`, é porque o módulo tem código nativo (Kotlin/Java) que precisa estar no APK. Hot reload do Metro só atualiza JS. Solução: rebuild EAS (passos acima).
+- **OCR com crop pela moldura** (Sub-stage 8a): `services/ocr.ts` está acoplado a `app/(tabs)/scan.tsx` por uma decisão importante — o crop é feito no `scan.tsx` ANTES de chamar `recognizeText`. Crop = 65% da largura da foto, centralizado, mantendo aspect 1.625:1 (proporção da moldura visual `260×160`). Se ajustar a moldura visual, ajustar também o ratio no `handleCapture`.
 
 ---
 
 ## 8. Próximos passos
 
-**Stage 6 (OCR real)** — pendente de decisão:
-- Hoje a tela Scan funciona em Expo Go mas pede para o usuário digitar
-  nome/preço manualmente após a foto.
-- Para o OCR automático, é necessário instalar `@react-native-ml-kit/text-recognition`
-  (ou alternativa nativa), rodar `npx expo prebuild`, e migrar pra dev client
-  (não roda mais em Expo Go).
-- O stub `services/ocr.ts` já tem `extractName` e `extractPrice` prontos;
-  basta preencher `recognizeText(uri)` com a chamada do ML Kit.
+### Sub-stage 8b — UI da IA + OpenAI (próximo)
 
-**Stage 8 — UI da IA**:
-- Tela `app/(tabs)/ai.tsx` com chat: bubbles do usuário (accent) e da IA
-  (card), chips de sugestões frequentes ("Meu gasto este mês", "Mercado
-  mais barato"), botão de mic com overlay de gravação animado.
-- `services/ai.ts` com função `query(pergunta)` que responde via consulta
-  ao banco SQLite (não LLM ainda). Estrutura preparada para receber
-  a chamada à API no Stage 9.
-- `hooks/useVoice.ts` envolvendo `@react-native-voice/voice` (a instalar).
+- Tela `app/(tabs)/ai.tsx` com chat: bubbles do usuário (accent) e da IA (card),
+  chips de sugestões fixos abaixo do header ("Gasto deste mês", "Mercado mais
+  barato", "Produtos que mais subiram"), input + botão send.
+- `services/ai.ts` com cliente OpenAI (fetch direto, sem SDK) usando
+  `EXPO_PUBLIC_OPENAI_API_KEY` do `.env`. Tool calling sobre as 8 queries
+  do banco já existentes em `database/queries/`.
+- Persistência de conversa em SQLite (nova migration 004 com tabela `ai_messages`)
+  para sobreviver entre sessões. Histórico enviado à IA é limitado (últimas
+  N mensagens) para controlar tokens.
+- `services/voice.ts` stub com `VOICE_AVAILABLE = false`. Botão de mic aparece
+  desabilitado ou com banner explicativo.
+- **Não exige novo build EAS** — todas as mudanças são em JS/TS.
 
-**Stages 9–10** — Integração IA real e polish (ver Seção 2).
+### Sub-stage 8c — Voz nativa (depois do 8b)
+
+- Instalar `@react-native-voice/voice`.
+- Adicionar `RECORD_AUDIO` em `app.json` permissions.
+- `npx expo prebuild --platform android --clean` + `eas build` (rebuild necessário).
+- Implementar `services/voice.ts` real e hook `useVoice()`.
+- Overlay de gravação na tela de IA.
+- Trocar `VOICE_AVAILABLE` pra `true`.
+
+### Stage 10 — Polish e onboarding (último)
+
+- Onboarding na primeira abertura.
+- Edge cases revelados pelo uso real.
+- Animações.
+- Decisão sobre monetização (backend próprio, assinatura) ou manter API key
+  local (uso pessoal).
+
+### Pendências menores
+
+- **Verde no design system** já está documentado nas seções 5 e 10, mas falta
+  consolidar no `docs/uiux/design-tokens.md` (próxima atualização da skill).
+- **Padrão `XXX_AVAILABLE`** (introduzido em `services/ocr.ts`) deve ser
+  documentado em `docs/uiux/patterns.md`.
 
 ---
 
@@ -272,6 +299,10 @@ git push                    # ao sair
   - `e21e48a` — Stage 4 (Histórico)
   - `93108ed` — Stage 5 (Listas nomeadas, migration 003)
   - `d3b58c9` — Fix layout list-detail (2 SwipeListViews + ScrollView pai)
+  - `3c286d3` — Stage 6 UI: câmera, viewfinder, form de resultado (OCR stub)
+  - `31e8567` — Stage 7: export/import CSV completos
+  - `cc92722` — Settings: Export/Import vira ActionBar fixo
+  - `69d6d7c` — **Sub-stage 8a**: dev client (EAS) + OCR real (ML Kit) + crop pela moldura
 - **Memórias do Claude na máquina local**:
   `~/.claude/projects/<project-slug>/memory/`. Em PC novo essas memórias
   começam vazias — este `CLAUDE.md` é o ponto de entrada do contexto e
@@ -288,7 +319,7 @@ git push                    # ao sair
 2. **Mockup** — gerar exemplo visual no claude.ai para aprovação **antes** de qualquer código
 3. **Aguardar aprovação** — nunca escrever código de UI sem o design confirmado
 4. **Implementar** — prompt detalhado com código completo, ordem de execução e checklist
-5. **Validar no celular** via Expo Go antes de commitar
+5. **Validar no celular** via dev client (Sub-stage 8a em diante) antes de commitar
 
 > Regra de ouro: design aprovado primeiro, código depois. Nunca ao contrário.
 
